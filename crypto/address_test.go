@@ -27,10 +27,10 @@ func TestAddress_isValidBase58(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestAddress_Encode(t *testing.T) {
+func TestAddress_StringWithMagic(t *testing.T) {
 	addr := newAddress(randBytes(AddressSize))
 
-	sAddr := addr.Encode(666)
+	sAddr := addr.ExtendedString(666)
 
 	assert.True(t, strings.HasPrefix(sAddr, "Like"))
 	assert.True(t, len(sAddr) > 44)
@@ -47,7 +47,7 @@ func TestParseAddress(t *testing.T) {
 }
 
 func TestParseAddress_withMagic(t *testing.T) {
-	strAddr := newAddress(randBytes(AddressSize)).Encode(0x19720000abba0000)
+	strAddr := newAddress(randBytes(AddressSize)).ExtendedString(0x19720000abba0000)
 
 	_, magicNum, err := ParseAddress(strAddr)
 
@@ -57,7 +57,7 @@ func TestParseAddress_withMagic(t *testing.T) {
 
 func TestParseAddress_Ex(t *testing.T) {
 	for i := 1; i < 1e3; i++ {
-		strAddr := newAddress(randBytes(AddressSize)).Encode(int64(i))
+		strAddr := newAddress(randBytes(AddressSize)).ExtendedString(int64(i))
 
 		_, mg, err := ParseAddress(strAddr)
 
@@ -73,4 +73,15 @@ func TestParseAddress_Fail(t *testing.T) {
 	_, _, err := ParseAddress(strAddr)
 
 	assert.Error(t, err)
+}
+
+func TestAddress_Decode(t *testing.T) {
+	a := newAddress(randBytes(AddressSize))
+	data := a.Encode()
+
+	var b Address
+	err := b.Decode(data)
+
+	assert.NoError(t, err)
+	assert.Equal(t, a, b)
 }

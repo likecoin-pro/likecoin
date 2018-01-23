@@ -20,7 +20,7 @@ const (
 type Address [AddressSize]byte
 
 var (
-	errAddrInvalidLength        = errors.New("crypto.newAddress: Invalid address length")
+	errAddrInvalidLength        = errors.New("crypto.Address: Invalid address length")
 	errParseAddrInvalid         = errors.New("crypto.ParseAddress: Invalid address")
 	errParseAddrUnknownVer      = errors.New("crypto.ParseAddress: Unknown address version")
 	errParseAddrInvalidCheckSum = errors.New("crypto.ParseAddress: Invalid check-sum")
@@ -35,7 +35,19 @@ func newAddress(data []byte) (addr Address) {
 }
 
 func (addr Address) String() string {
-	return addr.Encode(0)
+	return addr.ExtendedString(0)
+}
+
+func (addr Address) Encode() []byte {
+	return addr[:]
+}
+
+func (addr *Address) Decode(data []byte) error {
+	if len(data) != AddressSize {
+		return errAddrInvalidLength
+	}
+	copy(addr[:], data[:AddressSize])
+	return nil
 }
 
 func addrCheckSum(addr []byte, mgNum int64) []byte {
@@ -47,7 +59,7 @@ func addrCheckSum(addr []byte, mgNum int64) []byte {
 	return hash256(h.Sum(nil))[:checksumLen]
 }
 
-func (addr Address) Encode(magicNum int64) string {
+func (addr Address) ExtendedString(magicNum int64) string {
 	w := bin.NewBuffer(nil)
 	w.WriteByte(addressVer) // first byte have to > 0
 	w.Write(addr[:])
