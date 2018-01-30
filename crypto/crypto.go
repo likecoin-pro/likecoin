@@ -3,7 +3,6 @@ package crypto
 import (
 	"crypto/elliptic"
 	"crypto/rand"
-	"io"
 	"math/big"
 )
 
@@ -42,14 +41,13 @@ func fermatInverse(k, N *big.Int) *big.Int {
 }
 
 func hashInt(data []byte) *big.Int {
-	h256 := hash256(data)
-	return normInt(h256[:KeySize])
+	return normInt(hash256(data)[:KeySize])
 }
 
 func randBytes(n int) []byte {
 	buf := make([]byte, n)
-	if _, err := io.ReadFull(rand.Reader, buf); err != nil {
-		panic("reading from crypto/rand failed: " + err.Error())
+	if _, err := rand.Read(buf); err != nil {
+		panic(err)
 	}
 	return buf
 }
