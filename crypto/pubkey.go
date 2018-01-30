@@ -5,7 +5,8 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/likecoin-pro/likecoin/std/enc"
+	"github.com/likecoin-pro/likecoin/commons/enc"
+	"github.com/likecoin-pro/likecoin/crypto/base58"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -18,12 +19,12 @@ var (
 	errPublicKeyDecode = errors.New("crypto.PublicKey.Decode error: incorrect length of key")
 )
 
-//func (pub *PublicKey) VerifyPoW(data, sign []byte, difficulty uint64) bool {
+//func (PublicKey *PublicKey) VerifyPoW(data, sign []byte, difficulty uint64) bool {
 //	p := pow.NewPoW(nil, difficulty)
-//	return p.CheckHashDifficulty(hash256(sign)) && pub.Verify(data, sign)
+//	return p.CheckHashDifficulty(hash256(sign)) && PublicKey.Verify(data, sign)
 //}
 
-// Verify verifies the signature in r, s of hash using the public key, pub. Its
+// Verify verifies the signature in r, s of hash using the public key, PublicKey. Its
 // return value records whether the signature is valid.
 func (pub *PublicKey) Verify(data []byte, sign []byte) bool {
 	if pub.Empty() {
@@ -66,20 +67,12 @@ func (pub *PublicKey) Empty() bool {
 }
 
 func (pub *PublicKey) String() string {
-	return enc.Base64Encode(pub.Encode())
+	return base58.Encode(pub.Encode())
 }
-
-//func (pub *PublicKey) ID() uint64 {
-//	return pub.Address().ID()
-//}
 
 func (pub *PublicKey) Is(p *PublicKey) bool {
 	return pub != nil && p != nil && pub.x.Cmp(p.x) == 0 && pub.y.Cmp(p.y) == 0
 }
-
-//func (pub *PublicKey) StrAddress() string {
-//	return EncodeAddress(pub.Address())
-//}
 
 func (pub *PublicKey) Address() Address {
 	hash256 := newHash256()
@@ -88,13 +81,6 @@ func (pub *PublicKey) Address() Address {
 	h := sha3.Sum512(hash256.Sum(nil))
 	return newAddress(h[:AddressSize])
 }
-
-//func AddressToUserID(addr160 []byte) uint64 {
-//	if IsValidAddress(addr160) {
-//		return bin.BytesToUint64(addr160[:8])
-//	}
-//	return 0
-//}
 
 func (pub *PublicKey) Encode() []byte {
 	return append(
