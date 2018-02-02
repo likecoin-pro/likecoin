@@ -5,7 +5,6 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/likecoin-pro/likecoin/commons/enc"
 	"github.com/likecoin-pro/likecoin/crypto/base58"
 	"golang.org/x/crypto/sha3"
 )
@@ -18,11 +17,6 @@ type PublicKey struct {
 var (
 	errPublicKeyDecode = errors.New("crypto.PublicKey.Decode error: incorrect length of key")
 )
-
-//func (PublicKey *PublicKey) VerifyPoW(data, sign []byte, difficulty uint64) bool {
-//	p := pow.NewPoW(nil, difficulty)
-//	return p.CheckHashDifficulty(hash256(sign)) && PublicKey.Verify(data, sign)
-//}
 
 // Verify verifies the signature in r, s of hash using the public key, PublicKey. Its
 // return value records whether the signature is valid.
@@ -99,7 +93,7 @@ func (pub *PublicKey) Decode(data []byte) error {
 }
 
 func (pub *PublicKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(enc.Base64Encode(pub.Encode()))
+	return json.Marshal(pub.String())
 }
 
 func (pub *PublicKey) UnmarshalJSON(data []byte) error {
@@ -125,19 +119,11 @@ func MustParsePublicKey(pubkey string) *PublicKey {
 }
 
 func ParsePublicKey(str64 string) (pub *PublicKey, err error) {
-	data, err := enc.Base64Decode(str64)
+	data, err := base58.DecodeFixed(str64, PublicKeySize)
 	if err != nil {
 		return
 	}
-	if len(data) != PublicKeySize {
-		err = errors.New("Invalid public key")
-		return
-	}
-	pub, err = DecodePublicKey(data)
-	if err != nil {
-		return nil, err
-	}
-	return
+	return DecodePublicKey(data)
 }
 
 func DecodePublicKey(data []byte) (pub *PublicKey, err error) {

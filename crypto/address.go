@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	AddressSize = 24
+	AddressSize = 24 // 192 bits
 
 	addressPrefix = "Like"
 	addressVer    = '\xf3'
