@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -13,7 +14,7 @@ const (
 	AddressSize = 24 // 192 bits
 
 	addressPrefix = "Like"
-	addressVer    = '\xf3'
+	addressVer    = 0x01 //'\xf3'
 	checksumLen   = 3
 )
 
@@ -68,6 +69,23 @@ func (addr Address) ExtendedString(magicNum int64) string {
 	return addressPrefix + base58.Encode(w.Bytes())
 }
 
+func (addr Address) MarshalJSON() ([]byte, error) {
+	return json.Marshal(addr.String())
+}
+
+func (addr Address) UnmarshalJSON(data []byte) (err error) {
+	var s string
+	if err = json.Unmarshal(data, &s); err != nil {
+		return
+	}
+	if a, _, err := ParseAddress(s); err != nil {
+		return err
+	} else {
+		copy(addr[:], a[:])
+	}
+	return
+}
+
 func ParseAddress(strAddr string) (addr Address, magicNum int64, err error) {
 	if !strings.HasPrefix(strAddr, addressPrefix) {
 		err = errParseAddrUnknownVer
@@ -97,4 +115,12 @@ func ParseAddress(strAddr string) (addr Address, magicNum int64, err error) {
 		return
 	}
 	return
+}
+
+func MustParseAddress(strAddr string) Address {
+	addr, _, err := ParseAddress(strAddr)
+	if err != nil {
+		panic(err)
+	}
+	return addr
 }
