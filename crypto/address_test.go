@@ -14,8 +14,8 @@ func TestAddress_String(t *testing.T) {
 
 		sAddr := addr.String()
 
-		assert.True(t, strings.HasPrefix(sAddr, "LikeC"))
-		assert.Equal(t, 44, len(sAddr))
+		assert.True(t, strings.HasPrefix(sAddr, "Like"))
+		assert.Equal(t, 43, len(sAddr))
 	}
 }
 
@@ -27,26 +27,27 @@ func TestAddress_isValidBase58(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestAddress_StringWithMagic(t *testing.T) {
+func TestAddress_ExtendedString(t *testing.T) {
 	addr := newAddress(randBytes(AddressSize))
 
 	sAddr := addr.ExtendedString(666)
 
 	assert.True(t, strings.HasPrefix(sAddr, "Like"))
-	assert.True(t, len(sAddr) > 44)
+	assert.True(t, len(sAddr) > 43)
 }
 
 func TestParseAddress(t *testing.T) {
-	strAddr := "LikeC3ercQghTCsynJiNBQdMNhzxGYegR44Dw6mzQije"
+	randData := randBytes(AddressSize)
+	strAddr := newAddress(randData).String()
 
 	addr, magicNum, err := ParseAddress(strAddr)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "Playing with a Full Deck", string(addr[:]))
+	assert.Equal(t, randData, addr[:])
 	assert.Equal(t, int64(0), magicNum)
 }
 
-func TestParseAddress_withMagic(t *testing.T) {
+func TestParseAddress_withMagicNum(t *testing.T) {
 	strAddr := newAddress(randBytes(AddressSize)).ExtendedString(0x19720000abba0000)
 
 	_, magicNum, err := ParseAddress(strAddr)
@@ -55,7 +56,7 @@ func TestParseAddress_withMagic(t *testing.T) {
 	assert.Equal(t, int64(0x19720000abba0000), magicNum)
 }
 
-func TestParseAddress_Ex(t *testing.T) {
+func TestParseAddress_withMagicNum2(t *testing.T) {
 	for i := 1; i < 1e3; i++ {
 		strAddr := newAddress(randBytes(AddressSize)).ExtendedString(int64(i))
 
@@ -66,7 +67,7 @@ func TestParseAddress_Ex(t *testing.T) {
 	}
 }
 
-func TestParseAddress_Fail(t *testing.T) {
+func TestParseAddress_fail(t *testing.T) {
 	strAddr := newAddress(randBytes(AddressSize)).String()
 	strAddr += "a"
 
