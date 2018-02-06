@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"math/big"
@@ -15,7 +16,7 @@ type PublicKey struct {
 }
 
 var (
-	errPublicKeyDecode = errors.New("crypto.PublicKey.Decode error: incorrect length of key")
+	errPublicKeyDecode = errors.New("crypto-error: incorrect length of public key")
 )
 
 // Verify verifies the signature in r, s of hash using the public key, PublicKey. Its
@@ -69,11 +70,11 @@ func (pub *PublicKey) Is(p *PublicKey) bool {
 }
 
 func (pub *PublicKey) Address() Address {
-	hash256 := newHash256()
-	hash256.Write(intToBytes(pub.x))
-	hash256.Write(intToBytes(pub.y))
-	h := sha3.Sum512(hash256.Sum(nil))
-	return newAddress(h[:AddressSize])
+	h2 := sha256.New()
+	h2.Write(intToBytes(pub.x))
+	h2.Write(intToBytes(pub.y))
+	h3 := sha3.Sum512(h2.Sum(nil))
+	return newAddress(h3[:AddressSize])
 }
 
 func (pub *PublicKey) Encode() []byte {
