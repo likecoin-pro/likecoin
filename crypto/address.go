@@ -14,7 +14,7 @@ const (
 	AddressSize = 24 // 192 bits
 
 	addressPrefix = "Like"
-	addressVer    = 0x01 //'\xf3'
+	addressVer    = 0x01
 	checksumLen   = 3
 )
 
