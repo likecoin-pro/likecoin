@@ -1,84 +1,156 @@
 package state
 
 import (
+	"encoding/json"
 	"testing"
 
-	"errors"
-
+	"github.com/likecoin-pro/likecoin/crypto"
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	testCoin = crypto.Asset{255}
+
+	key0 = NewKey(crypto.MustParseAddress("Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK"), testCoin)
+	keyA = NewKey(crypto.MustParseAddress("Like5eBiwK1JXRTsfNAAPN5GD6zwUWjdvu5y8JXRiLJ"), testCoin)
+	keyB = NewKey(crypto.MustParseAddress("Like5T98kZKvq49awa7awjHWvD25wkJKMQD7g6Q5X9r"), testCoin)
+	keyC = NewKey(crypto.MustParseAddress("Like5LtpZeGE5Ve5NbjCeraFVY5GCcTSFv9FYDzb7nm"), testCoin)
+)
+
+func (s *State) init(k Key, v int64) *State {
+	s.vals[k.str()] = v
+	return s
+}
+
 func TestState_Get(t *testing.T) {
-	storage := TestStorage{"a": 10}
-	st := NewState(storage)
 
-	v0, err0 := st.Get([]byte("0"))
-	v1, err1 := st.Get([]byte("a"))
-	_, err2 := st.Get([]byte("err"))
+	st := NewState().init(keyA, 10)
 
-	assert.NoError(t, err0)
-	assert.NoError(t, err1)
-	assert.Error(t, err2)
+	v0 := st.Get(key0)
+	v1 := st.Get(keyA)
+
 	assert.Equal(t, int64(0), v0)
 	assert.Equal(t, int64(10), v1)
 }
 
-func TestState_Increment(t *testing.T) {
-	storage := TestStorage{"a": 10}
-	st := NewState(storage)
+func TestState_Keys(t *testing.T) {
+	st := NewState().init(keyA, 10).init(keyB, 5).init(keyC, 1)
 
-	err0 := st.Increment([]byte("0"), 1)
-	err1 := st.Increment([]byte("a"), 1)
-	err2 := st.Increment([]byte("a"), -2)
-	v0, _ := st.Get([]byte("0"))
-	vA, _ := st.Get([]byte("a"))
+	err := st.Execute(func() {
+		st.Inc(key0, 1)
+		st.Get(keyA)
+		st.Inc(keyB, -5)
+		st.Get(keyC)
+	})
+	changedKeys := st.Keys()
 
-	assert.NoError(t, err0)
-	assert.NoError(t, err1)
-	assert.NoError(t, err2)
+	assert.NoError(t, err)
+	assert.Equal(t, []Key{key0, keyB}, changedKeys)
+}
+
+func TestState_Equal(t *testing.T) {
+	a := NewState().init(keyA, 666)
+	a.Get(keyA)
+	a.Inc(key0, 123)
+
+	b := NewState().init(key0, 100).init(keyA, 333)
+	b.Get(keyB)
+	b.Inc(key0, 23)
+	b.Get(keyC)
+
+	c := NewState().init(key0, 123)
+	c.Get(key0)
+
+	assert.True(t, a.Equal(b))
+	assert.True(t, b.Equal(a))
+	assert.False(t, c.Equal(a))
+}
+
+func TestState_Inc(t *testing.T) {
+	st := NewState().init(keyA, 10)
+
+	err := st.Execute(func() {
+		st.Inc(key0, 1)
+		st.Inc(keyA, 1)
+		st.Inc(keyA, -2)
+	})
+
+	v0 := st.Get(key0)
+	vA := st.Get(keyA)
+
+	assert.NoError(t, err)
 	assert.Equal(t, int64(1), v0)
 	assert.Equal(t, int64(9), vA)
 }
 
-func TestState_Decrement(t *testing.T) {
-	storage := TestStorage{"a": 10}
-	st := NewState(storage)
+func TestState_Inc_fail(t *testing.T) {
+	st := NewState().init(keyA, 10)
 
-	err0 := st.Decrement([]byte("0"), 1)
-	err1 := st.Decrement([]byte("a"), 1)
-	err2 := st.Decrement([]byte("a"), 10)
-	v, _ := st.Get([]byte("a"))
+	err0 := st.Execute(func() { st.Inc(key0, -1) })
+	err1 := st.Execute(func() { st.Inc(keyA, -1) })
+	err2 := st.Execute(func() { st.Inc(keyA, -10) })
+	v0 := st.Get(key0)
+	vA := st.Get(keyA)
 
 	assert.Error(t, err0)
 	assert.NoError(t, err1)
 	assert.Error(t, err2)
-	assert.Equal(t, int64(9), v)
+	assert.Equal(t, int64(0), v0)
+	assert.Equal(t, int64(9), vA)
+}
+
+func TestState_Encode(t *testing.T) {
+	s1 := NewState().init(key0, 12)
+	s1.Inc(keyA, 34)
+	s1.Inc(keyB, 56)
+	data1 := s1.Encode()
+
+	var s2 = new(State)
+	err2 := s2.Decode(data1)
+	data2 := s2.Encode()
+
+	assert.NoError(t, err2)
+	assert.Equal(t, data1, data2)
 }
 
 func TestState_Decode(t *testing.T) {
-	storage := TestStorage{"a": 10}
-	s := NewState(storage)
-	s.Increment([]byte("0"), 1)
-	s.Increment([]byte("a"), -10)
-	data := s.Encode()
+	s := NewState().init(keyA, 10).init(keyB, 10)
+	s.Inc(key0, 1)
+	s.Inc(keyA, -10)
+	data := s.Encode() // encode only changed values
 
-	st := NewState(nil)
+	st := NewState()
 	err := st.Decode(data)
-
-	v0, _ := st.Get([]byte("0"))
-	vA, _ := st.Get([]byte("a"))
+	v0 := st.Get(key0)
+	vA := st.Get(keyA)
+	vB := st.Get(keyB)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1), v0)
 	assert.Equal(t, int64(0), vA)
+	assert.Equal(t, int64(0), vB) // 0 - because keyB is not imported
 }
 
-//-----------------------------------------------
-type TestStorage map[string]int64
+func TestState_MarshalJSON(t *testing.T) {
+	st := NewState().init(keyA, 123)
+	st.Inc(key0, 1)
+	st.Get(keyC)
+	st.Inc(keyB, 100)
+	st.Get(keyA)
 
-func (s TestStorage) GetState(key []byte) (int64, error) {
-	if string(key) == "err" {
-		return 0, errors.New("test-error")
-	}
-	return s[strKey(key)], nil
+	data, err := json.Marshal(st)
+
+	assert.NoError(t, err)
+	assert.JSONEq(t, `[
+	  {
+		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK",
+		"asset":   "ff",
+		"value":   1
+	  },
+	  {
+		"address": "Like5T98kZKvq49awa7awjHWvD25wkJKMQD7g6Q5X9r",
+		"asset":   "ff",
+		"value":   100
+	  }
+	]`, string(data))
 }
