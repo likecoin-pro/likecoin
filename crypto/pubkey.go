@@ -65,7 +65,7 @@ func (pub *PublicKey) String() string {
 	return base58.Encode(pub.Encode())
 }
 
-func (pub *PublicKey) Is(p *PublicKey) bool {
+func (pub *PublicKey) Equal(p *PublicKey) bool {
 	return pub != nil && p != nil && pub.x.Cmp(p.x) == 0 && pub.y.Cmp(p.y) == 0
 }
 
@@ -94,7 +94,7 @@ func (pub *PublicKey) Decode(data []byte) error {
 }
 
 func (pub *PublicKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(pub.String())
+	return []byte(`"` + pub.String() + `"`), nil
 }
 
 func (pub *PublicKey) UnmarshalJSON(data []byte) error {

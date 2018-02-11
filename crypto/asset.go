@@ -1,6 +1,9 @@
 package crypto
 
-import "encoding/hex"
+import (
+	"encoding/hex"
+	"encoding/json"
+)
 
 type Asset []byte
 
@@ -15,6 +18,10 @@ func (a Asset) Encode() []byte {
 func (a *Asset) Decode(data []byte) (err error) {
 	*a = data
 	return nil
+}
+
+func (a Asset) MarshalJSON() ([]byte, error) {
+	return json.Marshal(a.String())
 }
 
 func ParseAsset(s string) (Asset, error) {

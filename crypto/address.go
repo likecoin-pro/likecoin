@@ -39,6 +39,10 @@ func (addr Address) String() string {
 	return addr.ExtendedString(0)
 }
 
+func (addr Address) Equal(a Address) bool {
+	return bytes.Equal(addr[:], a[:])
+}
+
 func (addr Address) Encode() []byte {
 	return addr[:]
 }
