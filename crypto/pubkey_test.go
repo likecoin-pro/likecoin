@@ -23,7 +23,7 @@ func TestPublicKey_Decode(t *testing.T) {
 	err := pub.Decode(buf)
 
 	assert.NoError(t, err)
-	assert.True(t, testPub.Is(pub))
+	assert.True(t, testPub.Equal(pub))
 	assert.Equal(t, testPub, pub)
 }
 
@@ -59,7 +59,7 @@ func TestPublicKey_UnmarshalJSON(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, testPub, pub)
-	assert.True(t, testPub.Is(pub))
+	assert.True(t, testPub.Equal(pub))
 }
 
 func TestPublicKey_Is(t *testing.T) {
@@ -68,11 +68,11 @@ func TestPublicKey_Is(t *testing.T) {
 	pub2 := MustParsePublicKey("4pv2QxPs618pCCokGdD2U71A2ANfNc59i4xQavpKM9L3QjDw7mGLSzbrBkGmcjEzGJWTD6AadgmM9kZp8nssUyfa")
 	pub3 := MustParsePublicKey("5pv2QxPs618pCCokGdD2U71A2ANfNc59i4xQavpKM9L3QjDw7mGLSzbrBkGmcjEzGJWTD6AadgmM9kZp8nssUyfa")
 
-	assert.True(t, pub1.Is(pub2))
-	assert.True(t, pub1.Is(pub2))
-	assert.True(t, !pub0.Is(pub1))
-	assert.True(t, !pub1.Is(pub0))
-	assert.True(t, !pub1.Is(pub3))
+	assert.True(t, pub1.Equal(pub2))
+	assert.True(t, pub1.Equal(pub2))
+	assert.True(t, !pub0.Equal(pub1))
+	assert.True(t, !pub1.Equal(pub0))
+	assert.True(t, !pub1.Equal(pub3))
 }
 
 func TestPublicKey_Empty(t *testing.T) {
