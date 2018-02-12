@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	testCoin = crypto.Asset{255}
+	testCoin = crypto.Asset{127}
 
 	key0 = NewKey(crypto.MustParseAddress("Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK"), testCoin)
 	keyA = NewKey(crypto.MustParseAddress("Like5eBiwK1JXRTsfNAAPN5GD6zwUWjdvu5y8JXRiLJ"), testCoin)
