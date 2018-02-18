@@ -3,18 +3,19 @@ package state
 import (
 	"encoding/json"
 	"errors"
+	"math/big"
 	"sync"
 
 	"github.com/denisskin/bin"
 )
 
 type State struct {
-	vals   map[string]int64    //
-	sets   map[string]struct{} //
-	keys   []Key               //
-	getter func(key Key) int64 //
-	setter func(Key, int64)    //
-	mx     sync.Mutex          // ??
+	vals   map[string]Number    //
+	sets   map[string]struct{}  //
+	keys   []Key                //
+	getter func(key Key) Number //
+	setter func(Key, Number)    //
+	mx     sync.Mutex           // ??
 }
 
 var (
@@ -28,13 +29,13 @@ func NewState() *State {
 }
 
 func NewStateEx(
-	getter func(Key) int64,
-	setter func(Key, int64),
+	getter func(Key) Number,
+	setter func(Key, Number),
 ) *State {
 	return &State{
 		getter: getter,
 		setter: setter,
-		vals:   map[string]int64{},
+		vals:   map[string]Number{},
 		sets:   map[string]struct{}{},
 	}
 }
@@ -55,21 +56,23 @@ func (s *State) Keys() []Key {
 	return s.keys
 }
 
-func (s *State) Get(key Key) int64 {
+func (s *State) Get(key Key) (val Number) {
 	sKey := key.str()
-	if val, ok := s.vals[sKey]; ok {
-		return val
+	val, ok := s.vals[sKey]
+	if ok {
+		return
 	}
 	if s.getter != nil {
-		val := s.getter(key)
-		s.vals[sKey] = val
-		return val
-	} else {
-		return 0
+		val = s.getter(key)
 	}
+	if val == nil {
+		val = Int(0)
+	}
+	s.vals[sKey] = val
+	return
 }
 
-func (s *State) Set(key Key, v int64) {
+func (s *State) Set(key Key, v Number) {
 	sKey := key.str()
 	s.vals[sKey] = v
 	if _, ok := s.sets[sKey]; !ok {
@@ -81,20 +84,20 @@ func (s *State) Set(key Key, v int64) {
 	}
 }
 
-func (s *State) Inc(key Key, v int64) {
-	v = s.Get(key) + v
-	if v < 0 {
+func (s *State) Inc(key Key, v Number) {
+	c := new(big.Int).Add(s.Get(key), v)
+	if c.Sign() < 0 {
 		panic(ErrDecrement)
 	}
-	s.Set(key, v)
+	s.Set(key, c)
 }
 
-func (s *State) Equal(a *State) bool {
-	if len(s.keys) != len(a.keys) {
+func (s *State) Equal(s1 *State) bool {
+	if len(s.keys) != len(s1.keys) {
 		return false
 	}
 	for _, key := range s.keys {
-		if s.Get(key) != a.Get(key) {
+		if s.Get(key).Cmp(s1.Get(key)) != 0 {
 			return false
 		}
 	}
@@ -106,29 +109,29 @@ func (s *State) Encode() []byte {
 	w.WriteVarInt(len(s.keys))
 	for _, key := range s.keys {
 		w.WriteVar(key)
-		w.WriteVarInt64(s.Get(key))
+		w.WriteBigInt(s.Get(key))
 	}
 	return w.Bytes()
 }
 
 func (s *State) Decode(data []byte) error {
-	s.vals = map[string]int64{}
+	s.vals = map[string]Number{}
 	s.sets = map[string]struct{}{}
 
 	r := bin.NewBuffer(data)
 	var key Key
 	for n, _ := r.ReadVarInt(); n > 0 && r.Error() == nil; n-- {
 		r.ReadVar(&key)
-		v, _ := r.ReadVarInt64()
+		v, _ := r.ReadBigInt()
 		s.Set(key, v)
 	}
 	return r.Error()
 }
 
 type stateValue struct {
-	Addr  string `json:"address"`
-	Asset string `json:"asset"`
-	Value int64  `json:"value"`
+	Addr  string   `json:"address"`
+	Asset string   `json:"asset"`
+	Value *big.Int `json:"value"`
 }
 
 func (s *State) MarshalJSON() ([]byte, error) {
