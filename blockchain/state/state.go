@@ -10,17 +10,17 @@ import (
 )
 
 type State struct {
-	vals   map[string]Number    //
-	sets   map[string]struct{}  //
-	keys   []Key                //
-	getter func(key Key) Number //
-	setter func(Key, Number)    //
-	mx     sync.Mutex           // ??
+	vals   map[string]Number        //
+	sets   map[string]struct{}      //
+	keys   []Key                    //
+	getter func(key Key) Number     //
+	setter func(Key, Number, int64) //
+	mx     sync.Mutex               // ??
 }
 
 var (
 	//errIncrement = errors.New("blockchain/state-error: increment error")
-	ErrDecrement  = errors.New("blockchain/state-error: decrement error")
+	ErrDecrement  = errors.New("blockchain/state-error: not enough funds")
 	ErrInvalidKey = errors.New("blockchain/state-error: invalid key")
 )
 
@@ -30,7 +30,7 @@ func NewState() *State {
 
 func NewStateEx(
 	getter func(Key) Number,
-	setter func(Key, Number),
+	setter func(Key, Number, int64),
 ) *State {
 	return &State{
 		getter: getter,
@@ -47,7 +47,7 @@ func (s *State) NewSubState() *State {
 func (s *State) Copy() *State {
 	a := NewState()
 	for _, key := range s.Keys() {
-		a.Set(key, s.Get(key))
+		a.Set(key, s.Get(key), 0)
 	}
 	return a
 }
@@ -72,7 +72,7 @@ func (s *State) Get(key Key) (val Number) {
 	return
 }
 
-func (s *State) Set(key Key, v Number) {
+func (s *State) Set(key Key, v Number, tag int64) {
 	sKey := key.str()
 	s.vals[sKey] = v
 	if _, ok := s.sets[sKey]; !ok {
@@ -80,16 +80,16 @@ func (s *State) Set(key Key, v Number) {
 		s.sets[sKey] = struct{}{}
 	}
 	if s.setter != nil {
-		s.setter(key, v)
+		s.setter(key, v, tag)
 	}
 }
 
-func (s *State) Inc(key Key, v Number) {
+func (s *State) Inc(key Key, v Number, tag int64) {
 	c := new(big.Int).Add(s.Get(key), v)
 	if c.Sign() < 0 {
 		panic(ErrDecrement)
 	}
-	s.Set(key, c)
+	s.Set(key, c, tag)
 }
 
 func (s *State) Equal(s1 *State) bool {
@@ -123,7 +123,7 @@ func (s *State) Decode(data []byte) error {
 	for n, _ := r.ReadVarInt(); n > 0 && r.Error() == nil; n-- {
 		r.ReadVar(&key)
 		v, _ := r.ReadBigInt()
-		s.Set(key, v)
+		s.Set(key, v, 0)
 	}
 	return r.Error()
 }

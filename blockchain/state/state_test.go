@@ -37,9 +37,9 @@ func TestState_Keys(t *testing.T) {
 	st := NewState().init(keyA, 10).init(keyB, 5).init(keyC, 1)
 
 	err := st.Execute(func() {
-		st.Inc(key0, Int(1))
+		st.Inc(key0, Int(1), 0)
 		st.Get(keyA)
-		st.Inc(keyB, Int(-5))
+		st.Inc(keyB, Int(-5), 0)
 		st.Get(keyC)
 	})
 	changedKeys := st.Keys()
@@ -51,11 +51,11 @@ func TestState_Keys(t *testing.T) {
 func TestState_Equal(t *testing.T) {
 	a := NewState().init(keyA, 666)
 	a.Get(keyA)
-	a.Inc(key0, Int(123))
+	a.Inc(key0, Int(123), 0)
 
 	b := NewState().init(key0, 100).init(keyA, 333)
 	b.Get(keyB)
-	b.Inc(key0, Int(23))
+	b.Inc(key0, Int(23), 0)
 	b.Get(keyC)
 
 	c := NewState().init(key0, 123)
@@ -70,9 +70,9 @@ func TestState_Inc(t *testing.T) {
 	st := NewState().init(keyA, 10)
 
 	err := st.Execute(func() {
-		st.Inc(key0, Int(1))
-		st.Inc(keyA, Int(1))
-		st.Inc(keyA, Int(-2))
+		st.Inc(key0, Int(1), 0)
+		st.Inc(keyA, Int(1), 0)
+		st.Inc(keyA, Int(-2), 0)
 	})
 
 	v0 := st.Get(key0)
@@ -86,9 +86,9 @@ func TestState_Inc(t *testing.T) {
 func TestState_Inc_fail(t *testing.T) {
 	st := NewState().init(keyA, 10)
 
-	err0 := st.Execute(func() { st.Inc(key0, Int(-1)) })
-	err1 := st.Execute(func() { st.Inc(keyA, Int(-1)) })
-	err2 := st.Execute(func() { st.Inc(keyA, Int(-10)) })
+	err0 := st.Execute(func() { st.Inc(key0, Int(-1), 0) })
+	err1 := st.Execute(func() { st.Inc(keyA, Int(-1), 0) })
+	err2 := st.Execute(func() { st.Inc(keyA, Int(-10), 0) })
 	v0 := st.Get(key0)
 	vA := st.Get(keyA)
 
@@ -101,8 +101,8 @@ func TestState_Inc_fail(t *testing.T) {
 
 func TestState_Encode(t *testing.T) {
 	s1 := NewState().init(key0, 12)
-	s1.Inc(keyA, Int(34))
-	s1.Inc(keyB, Int(56))
+	s1.Inc(keyA, Int(34), 0)
+	s1.Inc(keyB, Int(56), 0)
 	data1 := s1.Encode()
 
 	var s2 = new(State)
@@ -115,8 +115,8 @@ func TestState_Encode(t *testing.T) {
 
 func TestState_Decode(t *testing.T) {
 	s := NewState().init(keyA, 10).init(keyB, 10)
-	s.Inc(key0, Int(1))
-	s.Inc(keyA, Int(-10))
+	s.Inc(key0, Int(1), 0)
+	s.Inc(keyA, Int(-10), 0)
 	data := s.Encode() // encode only changed values
 
 	st := NewState()
@@ -133,9 +133,9 @@ func TestState_Decode(t *testing.T) {
 
 func TestState_MarshalJSON(t *testing.T) {
 	st := NewState().init(keyA, 123)
-	st.Inc(key0, Int(1))
+	st.Inc(key0, Int(1), 0)
 	st.Get(keyC)
-	st.Inc(keyB, Int(100))
+	st.Inc(keyB, Int(100), 0)
 	st.Get(keyA)
 
 	data, err := json.Marshal(st)
