@@ -36,7 +36,7 @@ func newAddress(data []byte) (addr Address) {
 }
 
 func (addr Address) String() string {
-	return addr.ExtendedString(0)
+	return addr.TaggedString(0)
 }
 
 func (addr Address) Equal(a Address) bool {
@@ -55,21 +55,21 @@ func (addr *Address) Decode(data []byte) error {
 	return nil
 }
 
-func addrCheckSum(addr []byte, mgNum int64) []byte {
+func addrCheckSum(addr []byte, tag int64) []byte {
 	h := newHash256()
 	h.Write([]byte(addressPrefix))
 	h.Write([]byte{addressVer})
 	h.Write(addr)
-	h.Write(bin.Uint64ToBytes(uint64(mgNum)))
+	h.Write(bin.Uint64ToBytes(uint64(tag)))
 	return hash256(h.Sum(nil))[:checksumLen]
 }
 
-func (addr Address) ExtendedString(magicNum int64) string {
+func (addr Address) TaggedString(tag int64) string {
 	w := bin.NewBuffer(nil)
 	w.WriteByte(addressVer) // first byte have to > 0
 	w.Write(addr[:])
-	w.WriteVarInt64(magicNum)
-	w.Write(addrCheckSum(addr[:], magicNum))
+	w.WriteVarInt64(tag)
+	w.Write(addrCheckSum(addr[:], tag))
 	return addressPrefix + base58.Encode(w.Bytes())
 }
 
@@ -90,7 +90,7 @@ func (addr Address) UnmarshalJSON(data []byte) (err error) {
 	return
 }
 
-func ParseAddress(strAddr string) (addr Address, magicNum int64, err error) {
+func ParseAddress(strAddr string) (addr Address, tag int64, err error) {
 	if !strings.HasPrefix(strAddr, addressPrefix) {
 		err = errParseAddrUnknownVer
 		return
@@ -108,13 +108,13 @@ func ParseAddress(strAddr string) (addr Address, magicNum int64, err error) {
 		err = errParseAddrInvalid
 		return
 	}
-	if magicNum, err = r.ReadVarInt64(); err != nil {
+	if tag, err = r.ReadVarInt64(); err != nil {
 		err = errParseAddrInvalid
 		return
 	}
 	chSum := make([]byte, checksumLen)
 	_, err = r.Read(chSum[:])
-	if err != nil || !bytes.Equal(chSum, addrCheckSum(addr[:], magicNum)) {
+	if err != nil || !bytes.Equal(chSum, addrCheckSum(addr[:], tag)) {
 		err = errParseAddrInvalidCheckSum
 		return
 	}
