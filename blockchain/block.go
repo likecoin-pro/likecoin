@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"bytes"
-
 	"encoding/hex"
 	"encoding/json"
 
@@ -24,12 +23,6 @@ func (b *Block) NewBlock() *Block {
 			Num:      b.Num + 1,
 			PrevHash: b.Hash(),
 		},
-	}
-}
-
-func (b *Block) initItems() {
-	for _, it := range b.Items { // init items
-		it.block = b
 	}
 }
 
@@ -58,16 +51,20 @@ func (b *Block) merkleRoot() []byte {
 	return merkle.Root(hh)
 }
 
-func (b *Block) AddTx(st *state.State, tx Transaction) {
+func (b *Block) AddTx(st *state.State, tx Transaction) *BlockItem {
 	txState := st.NewSubState()
 	tx.Execute(txState)
 
-	b.Items = append(b.Items, &BlockItem{
+	it := &BlockItem{
 		Tx:    tx,
 		Ts:    timestamp(),
 		State: txState,
-		block: b,
-	})
+
+		block:    b,
+		blockIdx: len(b.Items),
+	}
+	b.Items = append(b.Items, it)
+	return it
 }
 
 func (b *Block) SetSign(prv *crypto.PrivateKey) {
@@ -112,7 +109,10 @@ func (b *Block) Decode(data []byte) error {
 		// items
 		&b.Items,
 	)
-	b.initItems()
+	for i, it := range b.Items {
+		it.block = b
+		it.blockIdx = i
+	}
 	return err
 }
 

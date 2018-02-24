@@ -6,11 +6,16 @@ import (
 )
 
 type BlockItem struct {
-	block *Block `json:"-"` // link on parent-block
-
 	Ts    int64        `json:"timestamp"` // timestamp in microsec
 	Tx    Transaction  `json:"tx"`        //
 	State *state.State `json:"state"`     // new state values
+
+	block    *Block `json:"-"` // link on parent-block
+	blockIdx int    `json:"-"` //
+}
+
+func (it *BlockItem) UID() uint64 {
+	return EncodeTxUID(it.block.Num, it.blockIdx)
 }
 
 func (it *BlockItem) Hash() []byte {
