@@ -20,8 +20,8 @@ type State struct {
 
 var (
 	//errIncrement = errors.New("blockchain/state-error: increment error")
-	ErrDecrement  = errors.New("blockchain/state-error: not enough funds")
-	ErrInvalidKey = errors.New("blockchain/state-error: invalid key")
+	ErrNegativeValue = errors.New("blockchain/state-error: not enough funds")
+	ErrInvalidKey    = errors.New("blockchain/state-error: invalid key")
 )
 
 func NewState() *State {
@@ -56,11 +56,11 @@ func (s *State) Keys() []Key {
 	return s.keys
 }
 
-func (s *State) Get(key Key) (val Number) {
-	sKey := key.str()
+func (s *State) Get(key Key) Number {
+	sKey := key.strKey()
 	val, ok := s.vals[sKey]
 	if ok {
-		return
+		return new(big.Int).Set(val)
 	}
 	if s.getter != nil {
 		val = s.getter(key)
@@ -69,11 +69,15 @@ func (s *State) Get(key Key) (val Number) {
 		val = Int(0)
 	}
 	s.vals[sKey] = val
-	return
+	return new(big.Int).Set(val)
 }
 
 func (s *State) Set(key Key, v Number, tag int64) {
-	sKey := key.str()
+	if v.Sign() < 0 {
+		s.Fail(ErrNegativeValue)
+		return
+	}
+	sKey := key.strKey()
 	s.vals[sKey] = v
 	if _, ok := s.sets[sKey]; !ok {
 		s.keys = append(s.keys, key)
@@ -84,12 +88,12 @@ func (s *State) Set(key Key, v Number, tag int64) {
 	}
 }
 
-func (s *State) Inc(key Key, v Number, tag int64) {
-	c := new(big.Int).Add(s.Get(key), v)
-	if c.Sign() < 0 {
-		panic(ErrDecrement)
-	}
-	s.Set(key, c, tag)
+func (s *State) Increment(key Key, v Number, tag int64) {
+	s.Set(key, new(big.Int).Add(s.Get(key), v), tag)
+}
+
+func (s *State) Decrement(key Key, v Number, tag int64) {
+	s.Increment(key, new(big.Int).Neg(v), tag)
 }
 
 func (s *State) Equal(s1 *State) bool {
@@ -129,8 +133,8 @@ func (s *State) Decode(data []byte) error {
 }
 
 type stateValue struct {
-	Addr  string   `json:"address"`
 	Asset string   `json:"asset"`
+	Addr  string   `json:"address"`
 	Value *big.Int `json:"value"`
 }
 
@@ -138,7 +142,7 @@ func (s *State) MarshalJSON() ([]byte, error) {
 	var vv []stateValue
 	for _, key := range s.keys {
 		vv = append(vv, stateValue{
-			Addr:  key.Address.String(),
+			Addr:  key.StrAddress(),
 			Asset: key.Asset.String(),
 			Value: s.Get(key),
 		})

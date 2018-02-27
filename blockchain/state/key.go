@@ -1,40 +1,51 @@
 package state
 
-import "github.com/likecoin-pro/likecoin/crypto"
+import (
+	"github.com/denisskin/bin"
+	"github.com/likecoin-pro/likecoin/crypto"
+)
 
 type Key struct {
-	crypto.Address
-	crypto.Asset
+	Asset   crypto.Asset
+	Address []byte
 }
 
-func NewKey(addr crypto.Address, a crypto.Asset) Key {
-	return Key{addr, a}
+func NewKey(addr crypto.Address, asset crypto.Asset) Key {
+	return Key{asset, addr.Encode()}
 }
 
-func (k Key) str() string {
-	return string(k.Address[:]) + string(k.Asset)
+func NewCounterKey(addr string, asset crypto.Asset) Key {
+	if !asset.IsCounter() {
+		panic("Asset is not a counter")
+	}
+	return Key{asset, []byte(addr)}
+}
+
+func (k Key) strKey() string {
+	return string(k.Asset) + ":" + string(k.Address)
 }
 
 func (k Key) String() string {
-	return k.Address.String() + ":" + k.Asset.String()
+	return k.Asset.String() + ":" + k.StrAddress()
+}
+
+func (k Key) StrAddress() string {
+	if k.Asset.IsCounter() { // external counter address
+		return string(k.Address) // raw data to string
+	}
+	return crypto.StringAddress(k.Address)
 }
 
 func (k Key) Encode() []byte {
-	b := make([]byte, 0, crypto.AddressSize+len(k.Asset))
-	b = append(b, k.Address.Encode()...)
-	b = append(b, k.Asset.Encode()...)
-	return b
+	return bin.Encode(
+		k.Asset,
+		k.Address,
+	)
 }
 
 func (k *Key) Decode(data []byte) error {
-	if len(data) < crypto.AddressSize+1 {
-		return ErrInvalidKey
-	}
-	if err := k.Address.Decode(data[:crypto.AddressSize]); err != nil {
-		return err
-	}
-	if err := k.Asset.Decode(data[crypto.AddressSize:]); err != nil {
-		return err
-	}
-	return nil
+	return bin.Decode(data,
+		&k.Asset,
+		&k.Address,
+	)
 }
