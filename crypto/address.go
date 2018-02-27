@@ -35,6 +35,10 @@ func newAddress(data []byte) (addr Address) {
 	return
 }
 
+func StringAddress(rawAddress []byte) string {
+	return newAddress(rawAddress).String()
+}
+
 func (addr Address) String() string {
 	return addr.TaggedString(0)
 }
@@ -77,7 +81,7 @@ func (addr Address) MarshalJSON() ([]byte, error) {
 	return json.Marshal(addr.String())
 }
 
-func (addr Address) UnmarshalJSON(data []byte) (err error) {
+func (addr *Address) UnmarshalJSON(data []byte) (err error) {
 	var s string
 	if err = json.Unmarshal(data, &s); err != nil {
 		return
