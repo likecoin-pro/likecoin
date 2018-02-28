@@ -1,4 +1,4 @@
-package crypto
+package assets
 
 import (
 	"encoding/hex"
@@ -11,14 +11,24 @@ func (a Asset) String() string {
 	return hex.EncodeToString(a)
 }
 
-func (a Asset) IsCounter() bool {
-	return len(a) > 1 && a[0] == 0
+func (a Asset) Type() uint8 {
+	return a[0]
 }
 
-func (a Asset) CounterAsset() Asset {
-	c := make(Asset, len(a)+1)
-	copy(c[1:], a)
-	return c
+func (a Asset) IsCoin() bool {
+	return a.Type() == CoinType
+}
+
+func (a Asset) IsCounter() bool {
+	return a.Type() == CounterType
+}
+
+func (a Asset) IsName() bool {
+	return a.Type() == NameType
+}
+
+func (a Asset) CoinCounter(mediaID string) Asset {
+	return NewCounter(a[1], mediaID)
 }
 
 func (a Asset) Encode() []byte {
