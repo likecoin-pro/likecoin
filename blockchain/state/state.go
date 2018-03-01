@@ -108,11 +108,16 @@ func (s *State) Equal(s1 *State) bool {
 	return true
 }
 
+func (s *State) Hash() []byte {
+	return bin.Hash256(s)
+}
+
 func (s *State) Encode() []byte {
 	w := bin.NewBuffer(nil)
 	w.WriteVarInt(len(s.keys))
 	for _, key := range s.keys {
-		w.WriteVar(key)
+		w.WriteVar(key.Asset)
+		w.WriteVar(key.Address)
 		w.WriteBigInt(s.Get(key))
 	}
 	return w.Bytes()
@@ -125,7 +130,8 @@ func (s *State) Decode(data []byte) error {
 	r := bin.NewBuffer(data)
 	var key Key
 	for n, _ := r.ReadVarInt(); n > 0 && r.Error() == nil; n-- {
-		r.ReadVar(&key)
+		r.ReadVar(&key.Asset)
+		r.ReadVar(&key.Address)
 		v, _ := r.ReadBigInt()
 		s.Set(key, v, 0)
 	}
@@ -142,8 +148,8 @@ func (s *State) MarshalJSON() ([]byte, error) {
 	var vv []stateValue
 	for _, key := range s.keys {
 		vv = append(vv, stateValue{
-			Addr:  key.StrAddress(),
 			Asset: key.Asset.String(),
+			Addr:  key.Address.String(),
 			Value: s.Get(key),
 		})
 	}

@@ -27,8 +27,8 @@ func (a Asset) IsName() bool {
 	return a.Type() == NameType
 }
 
-func (a Asset) CoinCounter(mediaID string) Asset {
-	return NewCounter(a[1], mediaID)
+func (a Asset) CoinCounter(counterID string) Asset {
+	return NewCounter(a[1], counterID)
 }
 
 func (a Asset) Encode() []byte {

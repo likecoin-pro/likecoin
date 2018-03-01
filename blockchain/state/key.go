@@ -2,38 +2,32 @@ package state
 
 import (
 	"github.com/denisskin/bin"
+	"github.com/likecoin-pro/likecoin/assets"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
 type Key struct {
-	Asset   crypto.Asset
-	Address []byte
+	Asset   assets.Asset
+	Address crypto.Address
 }
 
-func NewKey(addr crypto.Address, asset crypto.Asset) Key {
-	return Key{asset, addr.Encode()}
+func NewKey(asset assets.Asset, addr crypto.Address) Key {
+	return Key{asset, addr}
 }
 
-func NewCounterKey(addr string, asset crypto.Asset) Key {
-	if !asset.IsCounter() {
-		panic("Asset is not a counter")
+func NewCounterKey(coin assets.Asset, counterID string) Key {
+	if !coin.IsCoin() {
+		panic("Asset is not a coin")
 	}
-	return Key{asset, []byte(addr)}
+	return NewKey(coin.CoinCounter(counterID), crypto.NilAddress)
 }
 
 func (k Key) strKey() string {
-	return string(k.Asset) + ":" + string(k.Address)
+	return string(k.Asset) + string(k.Address[:])
 }
 
 func (k Key) String() string {
-	return k.Asset.String() + ":" + k.StrAddress()
-}
-
-func (k Key) StrAddress() string {
-	if k.Asset.IsCounter() { // external counter address
-		return string(k.Address) // raw data to string
-	}
-	return crypto.StringAddress(k.Address)
+	return k.Asset.String() + ":" + k.Address.String()
 }
 
 func (k Key) Encode() []byte {
