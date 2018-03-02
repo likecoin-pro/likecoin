@@ -6,6 +6,7 @@ import (
 
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
+	"github.com/likecoin-pro/likecoin/commons/enc"
 )
 
 type Transaction interface {
@@ -53,6 +54,10 @@ func newTransaction(typ TxType) (Transaction, error) {
 
 func TxID(tx Transaction) uint64 {
 	return TxIDByHash(tx.Hash())
+}
+
+func StrTxID(tx Transaction) string {
+	return enc.UintToHex(TxID(tx))
 }
 
 func TxIDByHash(txHash []byte) uint64 {
