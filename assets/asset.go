@@ -1,6 +1,7 @@
 package assets
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 )
@@ -29,6 +30,20 @@ func (a Asset) IsName() bool {
 
 func (a Asset) CoinCounter(counterID string) Asset {
 	return NewCounter(a[1], counterID)
+}
+
+func (a Asset) CounterID() string {
+	// if !a.IsCounter() || len(a) < 2 panic()
+	return string(a[2:])
+}
+
+func (a Asset) CounterType() uint8 {
+	// if !a.IsCounter() || len(a) < 2 panic()
+	return a[1]
+}
+
+func (a Asset) Equal(b Asset) bool {
+	return bytes.Equal(a, b)
 }
 
 func (a Asset) Encode() []byte {
