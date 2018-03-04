@@ -27,6 +27,14 @@ func TestAddress_isValidBase58(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestAddress_IsNil(t *testing.T) {
+	var addr Address
+
+	isNil := addr.IsNil()
+
+	assert.True(t, isNil)
+}
+
 func TestAddress_TaggedString(t *testing.T) {
 	addr := newAddress(randBytes(AddressSize))
 
@@ -76,6 +84,14 @@ func TestParseAddress_fail(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestAddress_Encode_nilAddress(t *testing.T) {
+	var addr Address
+
+	data := addr.Encode()
+
+	assert.Equal(t, 0, len(data))
+}
+
 func TestAddress_Decode(t *testing.T) {
 	a := newAddress(randBytes(AddressSize))
 	data := a.Encode()
@@ -85,4 +101,12 @@ func TestAddress_Decode(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, a, b)
+}
+
+func TestAddress_Decode_nilAddress(t *testing.T) {
+	var addr Address
+	err := addr.Decode(nil)
+
+	assert.NoError(t, err)
+	assert.True(t, addr.IsNil())
 }
