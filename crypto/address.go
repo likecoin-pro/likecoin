@@ -20,6 +20,8 @@ const (
 
 type Address [AddressSize]byte
 
+var NilAddress Address
+
 var (
 	errAddrInvalidLength        = errors.New("crypto.Address: Invalid address length")
 	errParseAddrInvalid         = errors.New("crypto.ParseAddress: Invalid address")
@@ -35,23 +37,34 @@ func newAddress(data []byte) (addr Address) {
 	return
 }
 
-func StringAddress(rawAddress []byte) string {
-	return newAddress(rawAddress).String()
-}
-
 func (addr Address) String() string {
 	return addr.TaggedString(0)
 }
 
+func (addr Address) IsNil() bool {
+	return addr == NilAddress
+}
+
 func (addr Address) Equal(a Address) bool {
-	return bytes.Equal(addr[:], a[:])
+	return addr == a
+}
+
+func (addr Address) ID() uint64 {
+	return bin.BytesToUint64(addr[:8])
 }
 
 func (addr Address) Encode() []byte {
+	if addr.IsNil() {
+		return nil
+	}
 	return addr[:]
 }
 
 func (addr *Address) Decode(data []byte) error {
+	if len(data) == 0 { // is nil address
+		*addr = Address{}
+		return nil
+	}
 	if len(data) != AddressSize {
 		return errAddrInvalidLength
 	}
@@ -69,6 +82,9 @@ func addrCheckSum(addr []byte, tag int64) []byte {
 }
 
 func (addr Address) TaggedString(tag int64) string {
+	if addr.IsNil() {
+		return ""
+	}
 	w := bin.NewBuffer(nil)
 	w.WriteByte(addressVer) // first byte have to > 0
 	w.Write(addr[:])
