@@ -38,6 +38,7 @@ var (
 	errTxNotFound            = errors.New("tx not found")
 	errUserHasBeenRegistered = errors.New("user has been registered")
 	errUserNotFound          = errors.New("user not found")
+	errIncorrectTxParams     = errors.New("incorrect tx params")
 	errIncorrectTxState      = errors.New("incorrect tx state")
 )
 
@@ -82,6 +83,11 @@ func (s *BlockchainStorage) PutBlock(block *blockchain.Block) (err error) {
 			tx := it.Tx
 			txID := it.TxID()
 			txUID := it.UID()
+
+			// check tx-chain info
+			if nw, chainID := tx.ChainInfo(); nw != config.NetworkID || chainID != config.ChainID {
+				tr.Fail(errIncorrectTxParams)
+			}
 
 			// check transaction by txID
 			if id, _ := tr.GetInt(goldb.Key(dbIdxTxID, txID)); id != 0 {
