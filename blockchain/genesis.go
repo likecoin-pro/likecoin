@@ -9,7 +9,7 @@ var genesisBlockHeader = BlockHeader{
 	PrevHash:   nil,
 	MerkleRoot: nil,
 	Nonce:      0,
-	Node:       config.MasterPublicKey,
+	Miner:      config.MasterPublicKey,
 }
 
 var genesisBlockHeaderHash = genesisBlockHeader.Hash()

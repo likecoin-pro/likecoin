@@ -9,16 +9,16 @@ import (
 )
 
 type BlockHeader struct {
-	Version    int    // version
-	Num        uint64 // number of block in chain
-	Timestamp  int64  // timestamp of block in microSec
-	PrevHash   []byte // hash of previous block
-	MerkleRoot []byte // merkle hash of transactions
+	Version    int       `json:"version"`       // version
+	Num        uint64    `json:"height"`        // number of block in blockchain
+	Timestamp  int64     `json:"timestamp"`     // timestamp of block in µsec
+	PrevHash   bin.Bytes `json:"previous_hash"` // hash of previous block
+	MerkleRoot bin.Bytes `json:"merkle_root"`   // merkle hash of transactions
 
-	// node sign
-	Nonce uint64            //
-	Node  *crypto.PublicKey // pub-key of master node
-	Sign  []byte            // master-node sign
+	// miner sign
+	Nonce uint64            `json:"nonce"`     //
+	Miner *crypto.PublicKey `json:"miner"`     // pub-key of miner
+	Sign  bin.Bytes         `json:"signature"` // miner-node sign
 }
 
 func (b *BlockHeader) Hash() []byte {
@@ -29,7 +29,7 @@ func (b *BlockHeader) Hash() []byte {
 		b.PrevHash,
 		b.MerkleRoot,
 		b.Nonce,
-		b.Node,
+		b.Miner,
 	)
 }
 
@@ -46,13 +46,13 @@ func (b *BlockHeader) Verify(pre *BlockHeader) error {
 			return ErrInvalidPrevHash
 		}
 	}
-	if b.Node.Empty() {
+	if b.Miner.Empty() {
 		return ErrEmptyNodeKey
 	}
-	if !b.Node.Equal(config.MasterPublicKey) {
+	if !b.Miner.Equal(config.MasterPublicKey) {
 		return ErrInvalidNodeKey
 	}
-	if !b.Node.Verify(hash, b.Sign) {
+	if !b.Miner.Verify(hash, b.Sign) {
 		return ErrInvalidSign
 	}
 	return nil

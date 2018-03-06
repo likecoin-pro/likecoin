@@ -2,18 +2,17 @@ package blockchain
 
 import (
 	"bytes"
-	"encoding/hex"
-	"encoding/json"
 
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
+	"github.com/likecoin-pro/likecoin/blockchain/transaction"
 	"github.com/likecoin-pro/likecoin/commons/merkle"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
 type Block struct {
 	BlockHeader
-	Items []*BlockItem
+	Items []*BlockItem `json:"transactions"`
 }
 
 func (b *Block) NewBlock() *Block {
@@ -51,11 +50,12 @@ func (b *Block) merkleRoot() []byte {
 	return merkle.Root(hh)
 }
 
-func (b *Block) AddTx(st *state.State, tx Transaction) *BlockItem {
-	txState := st.NewSubState()
-	tx.Execute(txState)
-
-	it := &BlockItem{
+func (b *Block) AddTx(st *state.State, tx transaction.Transaction) (it *BlockItem, err error) {
+	txState, err := st.Execute(tx)
+	if err != nil {
+		return
+	}
+	it = &BlockItem{
 		Tx:    tx,
 		Ts:    timestamp(),
 		State: txState,
@@ -64,15 +64,19 @@ func (b *Block) AddTx(st *state.State, tx Transaction) *BlockItem {
 		blockIdx: len(b.Items),
 	}
 	b.Items = append(b.Items, it)
-	return it
+	return
 }
 
 func (b *Block) SetSign(prv *crypto.PrivateKey) {
 	b.MerkleRoot = b.merkleRoot()
 	b.Timestamp = timestamp()
 	b.Nonce = 0
-	b.Node = prv.PublicKey
+	b.Miner = prv.PublicKey
 	b.Sign = prv.Sign(b.Hash())
+}
+
+func (b *Block) Size() int {
+	return len(b.Encode())
 }
 
 func (b *Block) Encode() []byte {
@@ -85,7 +89,7 @@ func (b *Block) Encode() []byte {
 		b.PrevHash,
 		b.MerkleRoot,
 		b.Nonce,
-		b.Node,
+		b.Miner,
 		b.Sign,
 
 		// items
@@ -103,7 +107,7 @@ func (b *Block) Decode(data []byte) error {
 		&b.PrevHash,
 		&b.MerkleRoot,
 		&b.Nonce,
-		&b.Node,
+		&b.Miner,
 		&b.Sign,
 
 		// items
@@ -114,28 +118,4 @@ func (b *Block) Decode(data []byte) error {
 		it.blockIdx = i
 	}
 	return err
-}
-
-func (b *Block) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Version    int          `json:"version"`
-		Num        uint64       `json:"num"`
-		Timestamp  int64        `json:"timestamp"`
-		PrevHash   string       `json:"prev_hash"`
-		MerkleRoot string       `json:"merkle_root"`
-		Nonce      uint64       `json:"nonce"`
-		Node       string       `json:"node"`
-		Sign       string       `json:"sign"`
-		Items      []*BlockItem `json:"items"`
-	}{
-		Version:    b.Version,
-		Num:        b.Num,
-		Timestamp:  b.Timestamp,
-		PrevHash:   hex.EncodeToString(b.PrevHash),
-		MerkleRoot: hex.EncodeToString(b.MerkleRoot),
-		Nonce:      b.Nonce,
-		Node:       b.Node.String(),
-		Sign:       hex.EncodeToString(b.Sign),
-		Items:      b.Items,
-	})
 }
