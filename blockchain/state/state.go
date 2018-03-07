@@ -7,15 +7,17 @@ import (
 	"sync"
 
 	"github.com/denisskin/bin"
+	"github.com/likecoin-pro/likecoin/assets"
+	"github.com/likecoin-pro/likecoin/commons/merkle"
+	"github.com/likecoin-pro/likecoin/crypto"
 )
 
 type State struct {
-	vals   map[string]Number        //
-	sets   map[string]struct{}      //
-	keys   []Key                    //
-	getter func(key Key) Number     //
-	setter func(Key, Number, int64) //
-	mx     sync.Mutex               // ??
+	getter func(assets.Asset, crypto.Address) Number //
+
+	vals map[string]Number //
+	sets []*Value          //
+	mx   sync.Mutex        // execution mutex
 }
 
 var (
@@ -24,84 +26,77 @@ var (
 	ErrInvalidKey    = errors.New("blockchain/state-error: invalid key")
 )
 
-func NewState() *State {
-	return NewStateEx(nil, nil)
-}
-
-func NewStateEx(
-	getter func(Key) Number,
-	setter func(Key, Number, int64),
-) *State {
+func NewState(getter func(assets.Asset, crypto.Address) Number) *State {
 	return &State{
 		getter: getter,
-		setter: setter,
 		vals:   map[string]Number{},
-		sets:   map[string]struct{}{},
 	}
 }
 
-func (s *State) NewSubState() *State {
-	return NewStateEx(s.Get, s.Set)
-}
-
 func (s *State) Copy() *State {
-	a := NewState()
-	for _, key := range s.Keys() {
-		a.Set(key, s.Get(key), 0)
+	a := NewState(nil)
+	for _, v := range s.sets {
+		a.Set(v.Asset, v.Address, v.Value, v.Tag)
 	}
 	return a
 }
 
-func (s *State) Keys() []Key {
-	return s.keys
+func strKey(a assets.Asset, addr crypto.Address) string {
+	return string(a) + string(addr[:])
 }
 
-func (s *State) Get(key Key) Number {
-	sKey := key.strKey()
+func (s *State) Get(asset assets.Asset, addr crypto.Address) Number {
+	sKey := strKey(asset, addr)
 	val, ok := s.vals[sKey]
-	if ok {
-		return new(big.Int).Set(val)
+	if !ok {
+		if s.getter != nil {
+			val = s.getter(asset, addr)
+		}
+		if val == nil {
+			val = Int(0)
+		}
+		s.vals[sKey] = val
 	}
-	if s.getter != nil {
-		val = s.getter(key)
-	}
-	if val == nil {
-		val = Int(0)
-	}
-	s.vals[sKey] = val
 	return new(big.Int).Set(val)
 }
 
-func (s *State) Set(key Key, v Number, tag int64) {
-	if v.Sign() < 0 {
+func (s *State) Values() []*Value {
+	return s.sets
+}
+
+func (s *State) set(v *Value) {
+	if v.Value.Sign() < 0 {
 		s.Fail(ErrNegativeValue)
 		return
 	}
-	sKey := key.strKey()
-	s.vals[sKey] = v
-	if _, ok := s.sets[sKey]; !ok {
-		s.keys = append(s.keys, key)
-		s.sets[sKey] = struct{}{}
+	s.vals[strKey(v.Asset, v.Address)] = v.Value
+	s.sets = append(s.sets, v)
+}
+
+func (s *State) Set(asset assets.Asset, addr crypto.Address, v Number, tag int64) {
+	s.set(&Value{asset, addr, v, tag})
+}
+
+func (s *State) Increment(asset assets.Asset, addr crypto.Address, delta Number, tag int64) {
+	if delta.Sign() == 0 {
+		return
 	}
-	if s.setter != nil {
-		s.setter(key, v, tag)
-	}
+	v := s.Get(asset, addr)
+	v = v.Add(v, delta)
+	s.Set(asset, addr, v, tag)
 }
 
-func (s *State) Increment(key Key, v Number, tag int64) {
-	s.Set(key, new(big.Int).Add(s.Get(key), v), tag)
+func (s *State) Decrement(asset assets.Asset, addr crypto.Address, delta Number, tag int64) {
+	v := new(big.Int).Neg(delta)
+	s.Increment(asset, addr, v, tag)
 }
 
-func (s *State) Decrement(key Key, v Number, tag int64) {
-	s.Increment(key, new(big.Int).Neg(v), tag)
-}
-
-func (s *State) Equal(s1 *State) bool {
-	if len(s.keys) != len(s1.keys) {
+func (s *State) Equal(b *State) bool {
+	if len(s.sets) != len(b.sets) {
 		return false
 	}
-	for _, key := range s.keys {
-		if s.Get(key).Cmp(s1.Get(key)) != 0 {
+	for i, v := range s.sets {
+		if !v.Equal(b.sets[i]) {
 			return false
 		}
 	}
@@ -109,65 +104,57 @@ func (s *State) Equal(s1 *State) bool {
 }
 
 func (s *State) Hash() []byte {
-	return bin.Hash256(s)
+	var hh = make([][]byte, len(s.sets))
+	for i, v := range s.sets {
+		hh[i] = v.Hash()
+	}
+	return merkle.Root(hh)
 }
 
 func (s *State) Encode() []byte {
-	w := bin.NewBuffer(nil)
-	w.WriteVarInt(len(s.keys))
-	for _, key := range s.keys {
-		w.WriteVar(key.Asset)
-		w.WriteVar(key.Address)
-		w.WriteBigInt(s.Get(key))
-	}
-	return w.Bytes()
+	return bin.Encode(s.sets)
 }
 
 func (s *State) Decode(data []byte) error {
-	s.vals = map[string]Number{}
-	s.sets = map[string]struct{}{}
+	s.vals, s.sets = map[string]Number{}, nil
 
-	r := bin.NewBuffer(data)
-	var key Key
-	for n, _ := r.ReadVarInt(); n > 0 && r.Error() == nil; n-- {
-		r.ReadVar(&key.Asset)
-		r.ReadVar(&key.Address)
-		v, _ := r.ReadBigInt()
-		s.Set(key, v, 0)
+	var vv []*Value
+	if err := bin.Decode(data, &vv); err != nil {
+		return err
 	}
-	return r.Error()
-}
-
-type stateValue struct {
-	Asset string   `json:"asset"`
-	Addr  string   `json:"address"`
-	Value *big.Int `json:"value"`
+	for _, v := range vv {
+		s.Set(v.Asset, v.Address, v.Value, v.Tag)
+	}
+	return nil
 }
 
 func (s *State) MarshalJSON() ([]byte, error) {
-	var vv []stateValue
-	for _, key := range s.keys {
-		vv = append(vv, stateValue{
-			Asset: key.Asset.String(),
-			Addr:  key.Address.String(),
-			Value: s.Get(key),
-		})
-	}
-	return json.Marshal(vv)
+	return json.Marshal(s.sets)
 }
 
 func (s *State) Fail(err error) {
 	panic(err)
 }
 
-func (s *State) Execute(fn func()) (err error) {
+type Transaction interface {
+	Execute(*State)
+}
+
+func (s *State) Execute(tx Transaction) (newState *State, err error) {
+
 	s.mx.Lock()
 	defer s.mx.Unlock()
 	defer func() {
 		err, _ = recover().(error)
 	}()
 
-	fn()
+	newState = NewState(s.Get)
+
+	tx.Execute(newState)
+
+	for _, v := range newState.sets {
+		s.set(v)
+	}
 
 	return
 }
