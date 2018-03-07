@@ -4,93 +4,105 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/likecoin-pro/likecoin/assets"
+	"github.com/likecoin-pro/likecoin/commons/enc"
 	"github.com/likecoin-pro/likecoin/crypto"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	testCoin = crypto.Asset{127}
+	coin = assets.LikeCoin
 
-	key0 = NewKey(crypto.MustParseAddress("Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK"), testCoin)
-	keyA = NewKey(crypto.MustParseAddress("Like5eBiwK1JXRTsfNAAPN5GD6zwUWjdvu5y8JXRiLJ"), testCoin)
-	keyB = NewKey(crypto.MustParseAddress("Like5T98kZKvq49awa7awjHWvD25wkJKMQD7g6Q5X9r"), testCoin)
-	keyC = NewKey(crypto.MustParseAddress("Like5LtpZeGE5Ve5NbjCeraFVY5GCcTSFv9FYDzb7nm"), testCoin)
+	addr0 = crypto.MustParseAddress("Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK")
+	addrA = crypto.MustParseAddress("Like5eBiwK1JXRTsfNAAPN5GD6zwUWjdvu5y8JXRiLJ")
+	addrB = crypto.MustParseAddress("Like5T98kZKvq49awa7awjHWvD25wkJKMQD7g6Q5X9r")
+	addrC = crypto.MustParseAddress("Like5LtpZeGE5Ve5NbjCeraFVY5GCcTSFv9FYDzb7nm")
 )
 
-func (s *State) init(k Key, v int64) *State {
-	s.vals[k.str()] = Int(v)
+func exec(fn func()) (err error) {
+	defer func() { err, _ = recover().(error) }()
+	fn()
+	return
+}
+
+func (s *State) init(addr crypto.Address, v int64) *State {
+	s.vals[strKey(coin, addr)] = Int(v)
 	return s
 }
 
 func TestState_Get(t *testing.T) {
 
-	st := NewState().init(keyA, 10)
+	st := NewState(nil).init(addrA, 10)
 
-	v0 := st.Get(key0)
-	v1 := st.Get(keyA)
+	v0 := st.Get(coin, addr0)
+	v1 := st.Get(coin, addrA)
 
 	assert.Equal(t, Int(0), v0)
 	assert.Equal(t, Int(10), v1)
 }
 
-func TestState_Keys(t *testing.T) {
-	st := NewState().init(keyA, 10).init(keyB, 5).init(keyC, 1)
+func TestState_Get_(t *testing.T) {
+	a := NewState(nil).init(addrA, 666)
+	a.Get(coin, addrA)
+	a.Increment(coin, addr0, Int(123), 0)
 
-	err := st.Execute(func() {
-		st.Inc(key0, Int(1), 0)
-		st.Get(keyA)
-		st.Inc(keyB, Int(-5), 0)
-		st.Get(keyC)
-	})
-	changedKeys := st.Keys()
+	b := NewState(nil).init(addr0, 100).init(addrA, 333)
+	b.Get(coin, addrB)
+	b.Increment(coin, addr0, Int(23), 0)
+	b.Get(coin, addrC)
 
-	assert.NoError(t, err)
-	assert.Equal(t, []Key{key0, keyB}, changedKeys)
-}
-
-func TestState_Equal(t *testing.T) {
-	a := NewState().init(keyA, 666)
-	a.Get(keyA)
-	a.Inc(key0, Int(123), 0)
-
-	b := NewState().init(key0, 100).init(keyA, 333)
-	b.Get(keyB)
-	b.Inc(key0, Int(23), 0)
-	b.Get(keyC)
-
-	c := NewState().init(key0, 123)
-	c.Get(key0)
+	c := NewState(nil).init(addr0, 123)
+	c.Get(coin, addr0)
 
 	assert.True(t, a.Equal(b))
 	assert.True(t, b.Equal(a))
 	assert.False(t, c.Equal(a))
 }
 
-func TestState_Inc(t *testing.T) {
-	st := NewState().init(keyA, 10)
+func TestState_Equal(t *testing.T) {
 
-	err := st.Execute(func() {
-		st.Inc(key0, Int(1), 0)
-		st.Inc(keyA, Int(1), 0)
-		st.Inc(keyA, Int(-2), 0)
+	a := NewState(nil)
+	b := NewState(nil)
+	c := NewState(nil)
+
+	a.Increment(coin, addr0, Int(11), 0)
+	b.Increment(coin, addr0, Int(11), 0)
+	c.Increment(coin, addr0, Int(11), 22)
+
+	a.Increment(coin, addrA, Int(22), 0)
+	b.Increment(coin, addrA, Int(22), 0)
+	c.Increment(coin, addrA, Int(22), 0)
+
+	assert.True(t, a.Equal(b))
+	assert.True(t, b.Equal(a))
+	assert.False(t, c.Equal(a))
+}
+
+func TestState_Increment(t *testing.T) {
+	st := NewState(nil).init(addrA, 10)
+
+	err := exec(func() {
+		st.Increment(coin, addr0, Int(1), 0)
+		st.Increment(coin, addrA, Int(1), 0)
+		st.Decrement(coin, addrA, Int(2), 0)
 	})
 
-	v0 := st.Get(key0)
-	vA := st.Get(keyA)
+	v0 := st.Get(coin, addr0)
+	vA := st.Get(coin, addrA)
 
 	assert.NoError(t, err)
 	assert.Equal(t, Int(1), v0)
 	assert.Equal(t, Int(9), vA)
 }
 
-func TestState_Inc_fail(t *testing.T) {
-	st := NewState().init(keyA, 10)
+func TestState_Decrement_fail(t *testing.T) {
+	st := NewState(nil).init(addrA, 10)
 
-	err0 := st.Execute(func() { st.Inc(key0, Int(-1), 0) })
-	err1 := st.Execute(func() { st.Inc(keyA, Int(-1), 0) })
-	err2 := st.Execute(func() { st.Inc(keyA, Int(-10), 0) })
-	v0 := st.Get(key0)
-	vA := st.Get(keyA)
+	err0 := exec(func() { st.Decrement(coin, addr0, Int(1), 0) })
+	err1 := exec(func() { st.Decrement(coin, addrA, Int(1), 0) })
+	err2 := exec(func() { st.Decrement(coin, addrA, Int(10), 0) })
+	v0 := st.Get(coin, addr0)
+	vA := st.Get(coin, addrA)
 
 	assert.Error(t, err0)
 	assert.NoError(t, err1)
@@ -100,9 +112,9 @@ func TestState_Inc_fail(t *testing.T) {
 }
 
 func TestState_Encode(t *testing.T) {
-	s1 := NewState().init(key0, 12)
-	s1.Inc(keyA, Int(34), 0)
-	s1.Inc(keyB, Int(56), 0)
+	s1 := NewState(nil).init(addr0, 12)
+	s1.Increment(coin, addrA, Int(34), 0)
+	s1.Increment(coin, addrB, Int(56), 0)
 	data1 := s1.Encode()
 
 	var s2 = new(State)
@@ -114,16 +126,16 @@ func TestState_Encode(t *testing.T) {
 }
 
 func TestState_Decode(t *testing.T) {
-	s := NewState().init(keyA, 10).init(keyB, 10)
-	s.Inc(key0, Int(1), 0)
-	s.Inc(keyA, Int(-10), 0)
+	s := NewState(nil).init(addrA, 10).init(addrB, 10)
+	s.Increment(coin, addr0, Int(1), 0)
+	s.Decrement(coin, addrA, Int(10), 0)
 	data := s.Encode() // encode only changed values
 
-	st := NewState()
+	st := NewState(nil)
 	err := st.Decode(data)
-	v0 := st.Get(key0)
-	vA := st.Get(keyA)
-	vB := st.Get(keyB)
+	v0 := st.Get(coin, addr0)
+	vA := st.Get(coin, addrA)
+	vB := st.Get(coin, addrB)
 
 	assert.NoError(t, err)
 	assert.Equal(t, Int(1), v0)
@@ -132,11 +144,11 @@ func TestState_Decode(t *testing.T) {
 }
 
 func TestState_MarshalJSON(t *testing.T) {
-	st := NewState().init(keyA, 123)
-	st.Inc(key0, Int(1), 0)
-	st.Get(keyC)
-	st.Inc(keyB, Int(100), 0)
-	st.Get(keyA)
+	st := NewState(nil).init(addrA, 123)
+	st.Increment(coin, addr0, Int(1), 111)
+	st.Get(coin, addrC)
+	st.Increment(coin, addrB, Int(100), 222)
+	st.Get(coin, addrA)
 
 	data, err := json.Marshal(st)
 
@@ -144,13 +156,57 @@ func TestState_MarshalJSON(t *testing.T) {
 	assert.JSONEq(t, `[
 	  {
 		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK",
-		"asset":   "7f",
-		"value":   1
+		"asset":   "0001",
+		"value":   1,
+		"tag":   111
 	  },
 	  {
 		"address": "Like5T98kZKvq49awa7awjHWvD25wkJKMQD7g6Q5X9r",
-		"asset":   "7f",
-		"value":   100
+		"asset":   "0001",
+		"value":   100,
+		"tag":   222
 	  }
 	]`, string(data))
+}
+
+func TestState_Values(t *testing.T) {
+	st := NewState(nil).init(addrA, 10).init(addrB, 5).init(addrC, 1)
+
+	err := exec(func() {
+		st.Increment(coin, addr0, Int(1), 111)
+		st.Get(coin, addrA)
+		st.Decrement(coin, addrB, Int(2), 222)
+		st.Decrement(coin, addrB, Int(3), 333)
+		st.Get(coin, addrC)
+		st.Increment(coin, addr0, Int(3), 333)
+	})
+	values := st.Values()
+
+	assert.NoError(t, err)
+	assert.JSONEq(t, `[
+	  {
+		"asset": "0001",
+		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK",
+		"value": 1,
+		"tag": 111
+	  },
+	  {
+		"asset": "0001",
+		"address": "Like5T98kZKvq49awa7awjHWvD25wkJKMQD7g6Q5X9r",
+		"value": 3,
+		"tag": 222
+	  },
+	  {
+		"asset": "0001",
+		"address": "Like5T98kZKvq49awa7awjHWvD25wkJKMQD7g6Q5X9r",
+		"value": 0,
+		"tag": 333
+	  },
+	  {
+		"asset": "0001",
+		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK",
+		"value": 4,
+		"tag": 333
+	  }
+	]`, enc.JSON(values))
 }
