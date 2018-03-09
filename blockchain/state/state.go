@@ -67,12 +67,12 @@ func (s *State) Values() []*Value {
 }
 
 func (s *State) set(v *Value) {
-	if v.Value.Sign() < 0 {
+	if v.Balance.Sign() < 0 {
 		s.Fail(ErrNegativeValue)
 		return
 	}
 	if v.ChainID == s.chainID {
-		s.vals[strKey(v.Asset, v.Address)] = v.Value
+		s.vals[strKey(v.Asset, v.Address)] = v.Balance
 	}
 	s.sets = append(s.sets, v)
 }
