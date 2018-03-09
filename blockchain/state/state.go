@@ -13,7 +13,8 @@ import (
 )
 
 type State struct {
-	getter func(assets.Asset, crypto.Address) Number //
+	chainID uint64
+	getter  func(assets.Asset, crypto.Address) Number //
 
 	vals map[string]Number //
 	sets []*Value          //
@@ -26,17 +27,18 @@ var (
 	ErrInvalidKey    = errors.New("blockchain/state-error: invalid key")
 )
 
-func NewState(getter func(assets.Asset, crypto.Address) Number) *State {
+func NewState(chainID uint64, getter func(assets.Asset, crypto.Address) Number) *State {
 	return &State{
-		getter: getter,
-		vals:   map[string]Number{},
+		chainID: chainID,
+		getter:  getter,
+		vals:    map[string]Number{},
 	}
 }
 
 func (s *State) Copy() *State {
-	a := NewState(nil)
+	a := NewState(s.chainID, nil)
 	for _, v := range s.sets {
-		a.Set(v.Asset, v.Address, v.Value, v.Tag)
+		a.set(v)
 	}
 	return a
 }
@@ -69,12 +71,18 @@ func (s *State) set(v *Value) {
 		s.Fail(ErrNegativeValue)
 		return
 	}
-	s.vals[strKey(v.Asset, v.Address)] = v.Value
+	if v.ChainID == s.chainID {
+		s.vals[strKey(v.Asset, v.Address)] = v.Value
+	}
 	s.sets = append(s.sets, v)
 }
 
 func (s *State) Set(asset assets.Asset, addr crypto.Address, v Number, tag int64) {
-	s.set(&Value{asset, addr, v, tag})
+	s.set(&Value{s.chainID, asset, addr, tag, v})
+}
+
+func (s *State) CrossChainSet(chainID uint64, asset assets.Asset, addr crypto.Address, v Number, tag int64) {
+	s.set(&Value{chainID, asset, addr, tag, v})
 }
 
 func (s *State) Increment(asset assets.Asset, addr crypto.Address, delta Number, tag int64) {
@@ -123,7 +131,7 @@ func (s *State) Decode(data []byte) error {
 		return err
 	}
 	for _, v := range vv {
-		s.Set(v.Asset, v.Address, v.Value, v.Tag)
+		s.set(v)
 	}
 	return nil
 }
@@ -148,10 +156,11 @@ func (s *State) Execute(tx Transaction) (newState *State, err error) {
 		err, _ = recover().(error)
 	}()
 
-	newState = NewState(s.Get)
+	newState = NewState(s.chainID, s.Get)
 
 	tx.Execute(newState)
 
+	// set on success
 	for _, v := range newState.sets {
 		s.set(v)
 	}

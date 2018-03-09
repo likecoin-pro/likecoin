@@ -7,10 +7,11 @@ import (
 )
 
 type Value struct {
+	ChainID uint64         `json:"chain"`
 	Asset   assets.Asset   `json:"asset"`
 	Address crypto.Address `json:"address"`
-	Value   Number         `json:"value"`
 	Tag     int64          `json:"tag"`
+	Value   Number         `json:"total"`
 }
 
 func (v *Value) Equal(b *Value) bool {
@@ -22,27 +23,30 @@ func (v *Value) Equal(b *Value) bool {
 
 func (v *Value) Hash() []byte {
 	return crypto.Hash256(
+		v.ChainID,
 		v.Asset,
 		v.Address,
-		v.Value,
 		v.Tag,
+		v.Value,
 	)
 }
 
 func (v *Value) Encode() []byte {
 	return bin.Encode(
+		v.ChainID,
 		v.Asset,
 		v.Address,
-		v.Value,
 		v.Tag,
+		v.Value,
 	)
 }
 
 func (v *Value) Decode(data []byte) error {
 	return bin.Decode(data,
+		&v.ChainID,
 		&v.Asset,
 		&v.Address,
-		&v.Value,
 		&v.Tag,
+		&v.Value,
 	)
 }
