@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/denisskin/bin"
@@ -72,23 +73,23 @@ func (addr *Address) Decode(data []byte) error {
 	return nil
 }
 
-func addrCheckSum(addr []byte, tag int64) []byte {
+func addrCheckSum(addr []byte, tag uint64) []byte {
 	h := newHash256()
 	h.Write([]byte(addressPrefix))
 	h.Write([]byte{addressVer})
 	h.Write(addr)
-	h.Write(bin.Uint64ToBytes(uint64(tag)))
+	h.Write(bin.Uint64ToBytes(tag))
 	return hash256(h.Sum(nil))[:checksumLen]
 }
 
-func (addr Address) TaggedString(tag int64) string {
+func (addr Address) TaggedString(tag uint64) string {
 	if addr.IsNil() {
 		return ""
 	}
 	w := bin.NewBuffer(nil)
 	w.WriteByte(addressVer) // first byte have to > 0
 	w.Write(addr[:])
-	w.WriteVarInt64(tag)
+	w.WriteVarUint64(tag)
 	w.Write(addrCheckSum(addr[:], tag))
 	return addressPrefix + base58.Encode(w.Bytes())
 }
@@ -110,7 +111,16 @@ func (addr *Address) UnmarshalJSON(data []byte) (err error) {
 	return
 }
 
-func ParseAddress(strAddr string) (addr Address, tag int64, err error) {
+func ParseAddress(strAddr string) (addr Address, tag uint64, err error) {
+
+	if i := strings.Index(strAddr, "0"); i > 0 {
+		if addr, _, err = ParseAddress(strAddr[:i]); err != nil {
+			return
+		}
+		tag, err = strconv.ParseUint(strAddr[i:], 0, 64)
+		return
+	}
+
 	if !strings.HasPrefix(strAddr, addressPrefix) {
 		err = errParseAddrUnknownVer
 		return
@@ -128,7 +138,7 @@ func ParseAddress(strAddr string) (addr Address, tag int64, err error) {
 		err = errParseAddrInvalid
 		return
 	}
-	if tag, err = r.ReadVarInt64(); err != nil {
+	if tag, err = r.ReadVarUint64(); err != nil {
 		err = errParseAddrInvalid
 		return
 	}
