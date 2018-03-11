@@ -19,6 +19,7 @@ func (b *Block) NewBlock() *Block {
 	return &Block{
 		BlockHeader: BlockHeader{
 			Version:  0,
+			ChainID:  b.ChainID,
 			Num:      b.Num + 1,
 			PrevHash: b.Hash(),
 		},
@@ -57,7 +58,6 @@ func (b *Block) AddTx(st *state.State, tx transaction.Transaction) (it *BlockIte
 	}
 	it = &BlockItem{
 		Tx:    tx,
-		Ts:    timestamp(),
 		State: txState,
 
 		block:    b,
@@ -84,6 +84,7 @@ func (b *Block) Encode() []byte {
 
 		// header
 		b.Version,
+		b.ChainID,
 		b.Num,
 		b.Timestamp,
 		b.PrevHash,
@@ -102,6 +103,7 @@ func (b *Block) Decode(data []byte) error {
 
 		// header
 		&b.Version,
+		&b.ChainID,
 		&b.Num,
 		&b.Timestamp,
 		&b.PrevHash,

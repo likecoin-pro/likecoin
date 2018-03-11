@@ -6,12 +6,12 @@ import (
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
 	"github.com/likecoin-pro/likecoin/blockchain/transaction"
+	"github.com/likecoin-pro/likecoin/crypto"
 )
 
 type BlockItem struct {
-	Ts    int64                   // timestamp in µsec
 	Tx    transaction.Transaction //
-	State *state.State            // new state values
+	State *state.State            // state changes
 
 	// not imported fields
 	block    *Block // link on parent-block
@@ -30,9 +30,16 @@ func (it *BlockItem) UID() uint64 {
 	return EncodeTxUID(it.block.Num, it.blockIdx)
 }
 
+func (it *BlockItem) BlockNum() uint64 {
+	return it.block.Num
+}
+
+func (it *BlockItem) Timestamp() int64 {
+	return it.block.Timestamp
+}
+
 func (it *BlockItem) Hash() []byte {
-	return bin.Hash256(
-		it.Ts,
+	return crypto.Hash256(
 		it.TxHash(),
 		it.State.Hash(),
 	)
@@ -40,7 +47,6 @@ func (it *BlockItem) Hash() []byte {
 
 func (it *BlockItem) Encode() []byte {
 	return bin.Encode(
-		it.Ts,
 		it.Tx,
 		it.State,
 	)
@@ -49,7 +55,6 @@ func (it *BlockItem) Encode() []byte {
 func (it *BlockItem) Decode(data []byte) (err error) {
 	tx0 := new(transaction.UnknownTransaction)
 	err = bin.Decode(data,
-		&it.Ts,
 		&tx0,
 		&it.State,
 	)
@@ -60,21 +65,36 @@ func (it *BlockItem) Decode(data []byte) (err error) {
 	return
 }
 
+func (it *BlockItem) TxHeader() transaction.Header {
+	return it.Tx.GetHeader()
+}
+
+func (it *BlockItem) TxType() transaction.Type {
+	return it.Tx.GetHeader().Type
+}
+
+func (it *BlockItem) StrTxType() string {
+	return it.Tx.GetHeader().StrType()
+}
+
+func (it *BlockItem) StrTxID() string {
+	return transaction.StrTxID(it.Tx)
+}
+
 func (it *BlockItem) MarshalJSON() ([]byte, error) {
-	h := it.Tx.GetHeader()
 	return json.Marshal(struct {
-		Ts        int64                   `json:"timestamp"` // timestamp in µsec
-		TxType    transaction.Type        `json:"tx_type"`   //
-		TxStrType string                  `json:"tx_stype"`  //
-		TxID      string                  `json:"tx_id"`     //
-		TxHash    bin.Bytes               `json:"tx_hash"`   //
-		Tx        transaction.Transaction `json:"tx"`        // transaction object
-		State     *state.State            `json:"state"`     // new state values
+		BlockNum  uint64                  `json:"block"`    //
+		BlockTs   int64                   `json:"block_ts"` //
+		TxStrType string                  `json:"tx_type"`  //
+		TxID      string                  `json:"tx_id"`    //
+		TxHash    bin.Bytes               `json:"tx_hash"`  //
+		Tx        transaction.Transaction `json:"tx"`       // transaction object
+		State     *state.State            `json:"state"`    // new state values
 	}{
-		Ts:        it.Ts,
-		TxType:    h.Type,
-		TxStrType: transaction.TypeName(h.Type),
-		TxID:      transaction.StrTxID(it.Tx),
+		BlockNum:  it.block.Num,
+		BlockTs:   it.block.Timestamp,
+		TxStrType: it.TxHeader().StrType(),
+		TxID:      it.StrTxID(),
 		TxHash:    it.TxHash(),
 		Tx:        it.Tx,
 		State:     it.State,
