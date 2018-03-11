@@ -3,33 +3,29 @@ package object
 import (
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
-	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
-	"github.com/likecoin-pro/likecoin/commons/hex"
+	"github.com/likecoin-pro/likecoin/blockchain/transaction"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
 type Transfer struct {
-	Version int               `json:"version"`
+	transaction.Header
 	From    *crypto.PublicKey `json:"from"`
 	Outs    []*TransferOut    `json:"outs"`
 	Comment string            `json:"comment"`
-	Sign    hex.Bytes         `json:"signature"`
+	Sign    bin.Bytes         `json:"signature"`
 }
 
 type TransferOut struct {
-	Asset  assets.Asset   `json:"asset"`
-	Amount state.Number   `json:"amount"`
-	Tag    int64          `json:"tag"`
-	To     crypto.Address `json:"to"`
-	ToTag  int64          `json:"to_tag"`
+	Asset     assets.Asset   `json:"asset"`
+	Amount    state.Number   `json:"amount"`
+	Tag       int64          `json:"tag"`
+	To        crypto.Address `json:"to"`
+	ToTag     int64          `json:"to_tag"`
+	ToChainID uint64         `json:"to_chain"`
 }
 
-var _ = blockchain.RegisterTransactionType(&Transfer{})
-
-func (tx *Transfer) Type() blockchain.TxType {
-	return TxTypeTransfer
-}
+var _ = transaction.Register(TxTypeTransfer, &Transfer{})
 
 func NewSimpleTransfer(
 	prv *crypto.PrivateKey,
@@ -40,10 +36,10 @@ func NewSimpleTransfer(
 	comment string,
 ) (t *Transfer) {
 	t = &Transfer{
-		Version: 0,
+		Header:  transaction.NewHeader(TxTypeTransfer, 0),
 		Comment: comment,
 	}
-	t.AddOut(asset, amount, tag, to, tag)
+	t.AddOut(asset, amount, tag, to, tag, t.ChainID)
 	t.SetSign(prv)
 	return
 }
@@ -54,19 +50,21 @@ func (tx *Transfer) AddOut(
 	tag int64,
 	to crypto.Address,
 	toTag int64,
+	toChainID uint64,
 ) {
 	tx.Outs = append(tx.Outs, &TransferOut{
-		Asset:  asset,
-		Amount: amount,
-		Tag:    tag,
-		To:     to,
-		ToTag:  toTag,
+		Asset:     asset,
+		Amount:    amount,
+		Tag:       tag,
+		To:        to,
+		ToTag:     toTag,
+		ToChainID: toChainID,
 	})
 }
 
 func (tx *Transfer) hash() []byte {
-	return bin.Hash256(
-		tx.Version,
+	return crypto.Hash256(
+		tx.Header,
 		tx.From,
 		tx.Outs,
 		tx.Comment,
@@ -80,7 +78,7 @@ func (tx *Transfer) SetSign(prv *crypto.PrivateKey) {
 
 func (tx *Transfer) Encode() []byte {
 	return bin.Encode(
-		tx.Version,
+		tx.Header,
 		tx.From,
 		tx.Outs,
 		tx.Comment,
@@ -90,7 +88,7 @@ func (tx *Transfer) Encode() []byte {
 
 func (tx *Transfer) Decode(data []byte) error {
 	return bin.Decode(data,
-		&tx.Version,
+		&tx.Header,
 		&tx.From,
 		&tx.Outs,
 		&tx.Comment,
@@ -104,6 +102,7 @@ func (t *TransferOut) Encode() []byte {
 		t.Tag,
 		t.To,
 		t.ToTag,
+		t.ToChainID,
 	)
 }
 
@@ -114,6 +113,7 @@ func (t *TransferOut) Decode(data []byte) error {
 		&t.Tag,
 		&t.To,
 		&t.ToTag,
+		&t.ToChainID,
 	)
 }
 
@@ -130,15 +130,19 @@ func (tx *Transfer) Totals() map[string]state.Number {
 	return vv
 }
 
-func (tx *Transfer) Execute(st *state.State) {
+func (tx *Transfer) Verify() error {
 	if !tx.From.Verify(tx.hash(), tx.Sign) {
-		st.Fail(ErrTxIncorrectSign)
+		return ErrTxIncorrectSign
 	}
 	for _, out := range tx.Outs {
 		if out.Amount.Sign() <= 0 {
-			st.Fail(ErrTxIncorrectAmount)
+			return ErrTxIncorrectAmount
 		}
 	}
+	return nil
+}
+
+func (tx *Transfer) Execute(st *state.State) {
 
 	fromAddr := tx.From.Address()
 	for _, out := range tx.Outs {
@@ -147,6 +151,10 @@ func (tx *Transfer) Execute(st *state.State) {
 		st.Decrement(out.Asset, fromAddr, out.Amount, out.Tag)
 
 		// increment amount to new address
-		st.Increment(out.Asset, out.To, out.Amount, out.ToTag)
+		if tx.ChainID == out.ToChainID {
+			st.Increment(out.Asset, out.To, out.Amount, out.ToTag)
+		} else {
+			st.CrossChainSet(out.ToChainID, out.Asset, out.To, out.Amount, out.ToTag)
+		}
 	}
 }

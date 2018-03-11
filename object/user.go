@@ -1,106 +1,111 @@
 package object
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
-	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
+	"github.com/likecoin-pro/likecoin/blockchain/transaction"
 	"github.com/likecoin-pro/likecoin/commons/hex"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
 type User struct {
-	Version   int                    `json:"version"`
-	Nick      string                 `json:"nick"`
-	PubKey    *crypto.PublicKey      `json:"pubkey"`
-	RefererID hex.Uint64             `json:"referer"`
-	Data      map[string]interface{} `json:"data"`
-	Sign      hex.Bytes              `json:"signature"`
+	transaction.Header
+	Nick       string            `json:"nick"`
+	PubKey     *crypto.PublicKey `json:"pubkey"`
+	ReferrerID hex.Uint64        `json:"referrer"`
+	Data       []byte            `json:"data"`
+	Sign       bin.Bytes         `json:"signature"`
 }
 
-var _ = blockchain.RegisterTransactionType(&User{})
-
-func (t *User) Type() blockchain.TxType {
-	return TxTypeUser
-}
+var _ = transaction.Register(TxTypeUser, &User{})
 
 func NewUser(
 	prv *crypto.PrivateKey,
 	nick string,
-	refererID uint64,
-	data map[string]interface{},
+	referrerID uint64,
+	data []byte,
 ) (t *User) {
 	t = &User{
-		Version:   0,
-		Nick:      nick,
-		PubKey:    prv.PublicKey,
-		RefererID: hex.Uint64(refererID),
-		Data:      data,
+		Header:     transaction.NewHeader(TxTypeUser, 0),
+		Nick:       nick,
+		PubKey:     prv.PublicKey,
+		ReferrerID: hex.Uint64(referrerID),
+		Data:       data,
 	}
 	t.SetSign(prv)
 	return
 }
 
-func (t *User) ID() uint64 {
-	return t.PubKey.ID()
+func (tx *User) ID() uint64 {
+	return tx.PubKey.ID()
 }
 
-func (t *User) Address() crypto.Address {
-	return t.PubKey.Address()
+func (tx *User) Address() crypto.Address {
+	return tx.PubKey.Address()
 }
 
-func (t *User) hash() []byte {
-	return bin.Hash256(
-		t.Version,
-		t.PubKey,
-		t.Nick,
-		t.PubKey,
-		t.RefererID,
-		t.Data,
+func (tx *User) hash() []byte {
+	return crypto.Hash256(
+		tx.Header,
+		tx.PubKey,
+		tx.Nick,
+		tx.ReferrerID,
+		tx.Data,
 	)
 }
 
-func (t *User) SetSign(prv *crypto.PrivateKey) {
-	t.PubKey = prv.PublicKey
-	t.Sign = prv.Sign(t.hash())
+func (tx *User) SetSign(prv *crypto.PrivateKey) {
+	tx.PubKey = prv.PublicKey
+	tx.Sign = prv.Sign(tx.hash())
 }
 
-func (t *User) Encode() []byte {
+func (tx *User) Encode() []byte {
 	return bin.Encode(
-		t.Version,
-		t.PubKey,
-		t.Nick,
-		t.PubKey,
-		t.RefererID,
-		t.Data,
-		t.Sign,
+		tx.Header,
+		tx.PubKey,
+		tx.Nick,
+		tx.ReferrerID,
+		tx.Data,
+		tx.Sign,
 	)
 }
 
-func (t *User) Decode(data []byte) error {
+func (tx *User) Decode(data []byte) error {
 	return bin.Decode(data,
-		&t.Version,
-		&t.PubKey,
-		&t.Nick,
-		&t.PubKey,
-		&t.RefererID,
-		&t.Data,
-		&t.Sign,
+		&tx.Header,
+		&tx.PubKey,
+		&tx.Nick,
+		&tx.ReferrerID,
+		&tx.Data,
+		&tx.Sign,
 	)
 }
 
-func (t *User) Verify() bool {
-	return t.PubKey.Verify(t.hash(), t.Sign)
+func (tx *User) Verify() error {
+	if !tx.PubKey.Verify(tx.hash(), tx.Sign) {
+		return ErrTxIncorrectSign
+	}
+	return nil
 }
 
-func (t *User) Execute(st *state.State) {
-	if !t.Verify() {
-		st.Fail(ErrTxIncorrectSign)
+func (tx *User) Execute(st *state.State) {
+	nameAsset := assets.NewName(tx.Nick)
+	userAddr := tx.Address()
+
+	// set username as asset to user-address
+	st.Set(nameAsset, userAddr, state.Int(1), 0)
+}
+
+func ParseUserID(s string) (userID uint64, err error) {
+	if len(s) <= 18 { // "0xFFFFFFFFFFFFFFFF" | "FFFFFFFFFFFFFFFF"
+		s = strings.TrimPrefix(s, "0x")
+		return strconv.ParseUint(s, 16, 64)
 	}
-
-	nameAsset := assets.NewName(t.Nick)
-	userAddr := t.Address()
-
-	// increment amount to new address
-	st.Increment(nameAsset, userAddr, state.Int(1), 0)
+	// todo: parse address
+	// todo: parse public key
+	return 0, ErrInvalidUserID
 }
