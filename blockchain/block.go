@@ -11,13 +11,13 @@ import (
 )
 
 type Block struct {
-	BlockHeader
-	Items []*BlockItem `json:"transactions"`
+	*BlockHeader
+	Items []*BlockItem `json:"txs"`
 }
 
 func (b *Block) NewBlock() *Block {
 	return &Block{
-		BlockHeader: BlockHeader{
+		BlockHeader: &BlockHeader{
 			Version:  0,
 			ChainID:  b.ChainID,
 			Num:      b.Num + 1,
@@ -31,19 +31,19 @@ func (b *Block) VerifyHeader(pre *Block) error {
 	if len(b.Items) == 0 {
 		return ErrEmptyBlock
 	}
-	if !bytes.Equal(b.MerkleRoot, b.merkleRoot()) {
+	if !bytes.Equal(b.TxRoot, b.txRoot()) {
 		return ErrInvalidMerkleRoot
 	}
 
 	// verify block header
-	if err := b.BlockHeader.Verify(&pre.BlockHeader); err != nil {
+	if err := b.BlockHeader.Verify(pre.BlockHeader); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (b *Block) merkleRoot() []byte {
+func (b *Block) txRoot() []byte {
 	var hh [][]byte
 	for _, it := range b.Items {
 		hh = append(hh, it.Hash())
@@ -68,7 +68,7 @@ func (b *Block) AddTx(st *state.State, tx transaction.Transaction) (it *BlockIte
 }
 
 func (b *Block) SetSign(prv *crypto.PrivateKey) {
-	b.MerkleRoot = b.merkleRoot()
+	b.TxRoot = b.txRoot()
 	b.Timestamp = timestamp()
 	b.Nonce = 0
 	b.Miner = prv.PublicKey
@@ -81,38 +81,14 @@ func (b *Block) Size() int {
 
 func (b *Block) Encode() []byte {
 	return bin.Encode(
-
-		// header
-		b.Version,
-		b.ChainID,
-		b.Num,
-		b.Timestamp,
-		b.PrevHash,
-		b.MerkleRoot,
-		b.Nonce,
-		b.Miner,
-		b.Sign,
-
-		// items
+		b.BlockHeader,
 		b.Items,
 	)
 }
 
 func (b *Block) Decode(data []byte) error {
 	err := bin.Decode(data,
-
-		// header
-		&b.Version,
-		&b.ChainID,
-		&b.Num,
-		&b.Timestamp,
-		&b.PrevHash,
-		&b.MerkleRoot,
-		&b.Nonce,
-		&b.Miner,
-		&b.Sign,
-
-		// items
+		&b.BlockHeader,
 		&b.Items,
 	)
 	for i, it := range b.Items {
