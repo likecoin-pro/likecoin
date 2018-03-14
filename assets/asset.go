@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 )
 
 type Asset []byte
 
 func (a Asset) String() string {
-	return hex.EncodeToString(a)
+	if len(a) > 0 {
+		return "0x" + hex.EncodeToString(a)
+	}
+	return ""
 }
 
 func (a Asset) Type() uint8 {
@@ -28,13 +32,30 @@ func (a Asset) IsName() bool {
 	return a.Type() == NameType
 }
 
-func (a Asset) CoinCounter(counterID string) Asset {
+func (a Asset) Label() string {
+	s := a.String()
+	if l := labels[s]; l != "" {
+		return l
+	}
+	return s
+}
+
+func (a Asset) Counter(counterID string) Asset {
 	return NewCounter(a[1], counterID)
 }
 
 func (a Asset) CounterID() string {
 	// if !a.IsCounter() || len(a) < 2 panic()
 	return string(a[2:])
+}
+
+func (a Asset) CounterSrcURL() string {
+	// if !a.IsCounter() || len(a) < 2 panic()
+	cntTyp, cntID := a[1], string(a[2:])
+	if src := mediaSrcURLs[cntTyp]; src != "" {
+		return strings.Replace(src, "{ID}", cntID, 1)
+	}
+	return ""
 }
 
 func (a Asset) CounterType() uint8 {
@@ -64,11 +85,12 @@ func (a *Asset) UnmarshalJSON(data []byte) (err error) {
 	if err = json.Unmarshal(data, &s); err != nil {
 		return err
 	}
-	*a, err = hex.DecodeString(s)
+	*a, err = ParseAsset(s)
 	return
 }
 
 func ParseAsset(s string) (Asset, error) {
+	s = strings.TrimPrefix(s, "0x")
 	data, err := hex.DecodeString(s)
 	return Asset(data), err
 }
