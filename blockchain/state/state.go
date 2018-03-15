@@ -8,8 +8,8 @@ import (
 
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
-	"github.com/likecoin-pro/likecoin/commons/merkle"
 	"github.com/likecoin-pro/likecoin/crypto"
+	"github.com/likecoin-pro/likecoin/crypto/merkle"
 )
 
 type State struct {

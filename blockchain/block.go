@@ -6,8 +6,8 @@ import (
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
 	"github.com/likecoin-pro/likecoin/blockchain/transaction"
-	"github.com/likecoin-pro/likecoin/commons/merkle"
 	"github.com/likecoin-pro/likecoin/crypto"
+	"github.com/likecoin-pro/likecoin/crypto/merkle"
 )
 
 type Block struct {
