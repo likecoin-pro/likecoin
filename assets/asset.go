@@ -33,11 +33,10 @@ func (a Asset) IsName() bool {
 }
 
 func (a Asset) Label() string {
-	s := a.String()
-	if l := labels[s]; l != "" {
-		return l
+	if s := coinLabels[a[1]]; s != "" {
+		return s
 	}
-	return s
+	return a.String()
 }
 
 func (a Asset) Counter(counterID string) Asset {
@@ -52,7 +51,7 @@ func (a Asset) CounterID() string {
 func (a Asset) CounterSrcURL() string {
 	// if !a.IsCounter() || len(a) < 2 panic()
 	cntTyp, cntID := a[1], string(a[2:])
-	if src := mediaSrcURLs[cntTyp]; src != "" {
+	if src := coinSrcURLs[cntTyp]; src != "" {
 		return strings.Replace(src, "{ID}", cntID, 1)
 	}
 	return ""

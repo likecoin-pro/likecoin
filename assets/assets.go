@@ -7,6 +7,14 @@ const (
 	NameType    = 2
 )
 
+// coin units
+const (
+	Coin      = 1e9
+	MilliCoin = 1e6
+	MicroCoin = 1e3
+	NanoCoin  = 1
+)
+
 var (
 	LikeCoin = YotubeCoin
 
@@ -28,13 +36,13 @@ func NewName(name string) Asset {
 	return append(Asset{NameType}, []byte(name)...)
 }
 
-var labels = map[string]string{
-	LikeCoin.String():  "LIKE",
-	InstaCoin.String(): "InLIKE",
-	YoukuCoin.String(): "YkLIKE",
+var coinLabels = map[uint8]string{
+	1: "LIKE",
+	2: "InLIKE",
+	3: "YkLIKE",
 }
 
-var mediaSrcURLs = map[uint8]string{
+var coinSrcURLs = map[uint8]string{
 	1: "https://www.youtube.com/watch?v={ID}",
 	2: "https://www.instagram.com/p/{ID}/",
 	3: "https://v.youku.com/v_show/id_{ID}",
