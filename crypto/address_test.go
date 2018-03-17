@@ -65,7 +65,7 @@ func TestParseAddress_withTag(t *testing.T) {
 }
 
 func TestParseAddress_withTag2(t *testing.T) {
-	for i := int64(1); i < 1e3; i++ {
+	for i := uint64(1); i < 1e3; i++ {
 		strAddr := newAddress(randBytes(AddressSize)).TaggedString(i)
 
 		_, tag, err := ParseAddress(strAddr)
@@ -73,6 +73,16 @@ func TestParseAddress_withTag2(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, i, tag)
 	}
+}
+
+func TestParseAddress_withTagSuffix(t *testing.T) {
+	strAddr := "Like5A2PEu6eCHQzy1tMsa6b3kc1xXS7ywj2NQaSsgE0x666"
+
+	addr, tag, err := ParseAddress(strAddr)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "Like5A2PEu6eCHQzy1tMsa6b3kc1xXS7ywj2NQaSsgE", addr.String())
+	assert.EqualValues(t, 0x666, tag)
 }
 
 func TestParseAddress_fail(t *testing.T) {
