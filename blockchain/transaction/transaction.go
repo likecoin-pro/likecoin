@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
@@ -13,7 +12,8 @@ import (
 )
 
 type Transaction interface {
-	GetHeader() Header
+	GetHeader() *Header
+	Hash() []byte
 	Encode() []byte
 	Decode([]byte) error
 	Verify() error
@@ -45,16 +45,8 @@ func Register(txType Type, tx Transaction) error {
 		typ = typ.Elem()
 	}
 	txTypes[txType] = typ
-	txTypeNames[txType] = strings.ToLower(typ.Name())
+	txTypeNames[txType] = typ.Name()
 	return nil
-}
-
-func TypeName(typ Type) string {
-	s, ok := txTypeNames[typ]
-	if !ok {
-		return "unknown_tx"
-	}
-	return s
 }
 
 func newTxByType(typ Type) (Transaction, error) {
@@ -70,12 +62,8 @@ func newTxByType(typ Type) (Transaction, error) {
 	}
 }
 
-func Hash(tx Transaction) []byte {
-	return bin.Hash256(tx.Encode())
-}
-
 func TxID(tx Transaction) uint64 {
-	return TxIDByHash(Hash(tx))
+	return TxIDByHash(tx.Hash())
 }
 
 func StrTxID(tx Transaction) string {
@@ -91,4 +79,17 @@ func ParseTxID(s string) (uint64, error) {
 
 func TxIDByHash(txHash []byte) uint64 {
 	return bin.BytesToUint64(txHash[:8])
+}
+
+func Decode(data []byte) (tx Transaction, err error) {
+	var tx0 = new(Unknown)
+	if err = tx0.Decode(data); err != nil {
+		return
+	}
+	if tx, _ = newTxByType(tx0.Header.Type); tx != nil {
+		err = tx.Decode(data)
+	} else {
+		tx = tx0
+	}
+	return
 }

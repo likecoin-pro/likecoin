@@ -5,38 +5,44 @@ import (
 
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
+	"github.com/likecoin-pro/likecoin/crypto"
 )
 
-type UnknownTransaction struct {
+// Unknown transaction
+type Unknown struct {
 	Header
 	RawData []byte `json:"raw_data"`
 }
 
-func (tx *UnknownTransaction) DecodeTransaction() (t Transaction, err error) {
-	t, err = newTxByType(tx.Type)
-	if err != nil {
-		return tx, nil
-	}
-	err = t.Decode(tx.RawData)
+func (tx *Unknown) Encode() []byte {
+	buf := bin.NewBuffer(nil)
+	buf.WriteVar(tx.Header)
+	buf.Write(tx.RawData)
+	return buf.Bytes()
+}
+
+func (tx *Unknown) Decode(data []byte) (err error) {
+	buf := bin.NewBuffer(data)
+	err = buf.ReadVar(&tx.Header)
+	tx.RawData = data[buf.CntRead:]
 	return
 }
 
-func (tx *UnknownTransaction) Encode() []byte {
-	return tx.RawData
+func (tx *Unknown) Hash() []byte {
+	return crypto.MerkleRoot(
+		tx.HeaderHash(),
+		tx.dataHash(),
+	)
 }
 
-func (tx *UnknownTransaction) Decode(data []byte) error {
-	if err := bin.Decode(data, &tx.Header); err != nil {
-		return err
-	}
-	tx.RawData = data
-	return nil
+func (tx *Unknown) dataHash() []byte {
+	return crypto.Hash256(tx.RawData)
 }
 
-func (tx *UnknownTransaction) Verify() error {
-	return nil
+func (tx *Unknown) Verify() error {
+	return tx.Header.VerifySign(tx)
 }
 
-func (tx *UnknownTransaction) Execute(st *state.State) {
+func (tx *Unknown) Execute(st *state.State) {
 	st.Fail(fmt.Errorf("unknown transaction type %d. Can`t be executed", tx.Type))
 }
