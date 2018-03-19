@@ -1,15 +1,12 @@
 package state
 
 import (
-	"encoding/json"
 	"errors"
 	"math/big"
 	"sync"
 
-	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
 	"github.com/likecoin-pro/likecoin/crypto"
-	"github.com/likecoin-pro/likecoin/crypto/merkle"
 )
 
 type State struct {
@@ -62,7 +59,7 @@ func (s *State) Get(asset assets.Asset, addr crypto.Address) Number {
 	return new(big.Int).Set(val)
 }
 
-func (s *State) Values() []*Value {
+func (s *State) Values() Values {
 	return s.sets
 }
 
@@ -97,47 +94,6 @@ func (s *State) Increment(asset assets.Asset, addr crypto.Address, delta Number,
 func (s *State) Decrement(asset assets.Asset, addr crypto.Address, delta Number, tag int64) {
 	v := new(big.Int).Neg(delta)
 	s.Increment(asset, addr, v, tag)
-}
-
-func (s *State) Equal(b *State) bool {
-	if len(s.sets) != len(b.sets) {
-		return false
-	}
-	for i, v := range s.sets {
-		if !v.Equal(b.sets[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-func (s *State) Hash() []byte {
-	var hh = make([][]byte, len(s.sets))
-	for i, v := range s.sets {
-		hh[i] = v.Hash()
-	}
-	return merkle.Root(hh)
-}
-
-func (s *State) Encode() []byte {
-	return bin.Encode(s.sets)
-}
-
-func (s *State) Decode(data []byte) error {
-	s.vals, s.sets = map[string]Number{}, nil
-
-	var vv []*Value
-	if err := bin.Decode(data, &vv); err != nil {
-		return err
-	}
-	for _, v := range vv {
-		s.set(v)
-	}
-	return nil
-}
-
-func (s *State) MarshalJSON() ([]byte, error) {
-	return json.Marshal(s.sets)
 }
 
 func (s *State) Fail(err error) {
