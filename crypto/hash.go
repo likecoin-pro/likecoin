@@ -17,16 +17,14 @@ func newHash256() hash.Hash {
 }
 
 func Hash256(values ...interface{}) []byte {
-	if len(values) == 1 {
-		if bb, ok := values[0].([]byte); ok {
-			return hash256(bb)
-		}
-	}
-
 	h := newHash256()
 	w := bin.NewWriter(h)
 	for _, val := range values {
-		w.WriteVar(val)
+		if bb, ok := val.([]byte); ok {
+			w.Write(bb)
+		} else {
+			w.WriteVar(val)
+		}
 	}
 	return h.Sum(nil)
 }
