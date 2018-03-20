@@ -15,17 +15,10 @@ func hash(a, b []byte) []byte {
 	return h.Sum(nil)
 }
 
-func copySlice(src [][]byte) [][]byte {
-	bb := make([][]byte, len(src))
-	copy(bb, src)
-	return bb
-}
-
-func Root(hashes [][]byte) []byte {
+func Root(hashes ...[]byte) []byte {
 	if len(hashes) == 0 {
 		return nil
 	}
-	hashes = copySlice(hashes)
 	for len(hashes) > 1 {
 		n := len(hashes)
 		m := n / 2
@@ -41,8 +34,10 @@ func Root(hashes [][]byte) []byte {
 	return hashes[0]
 }
 
-func Proof(hashes [][]byte, i int) (proof []byte) {
-	hashes = copySlice(hashes)
+func Proof(hashes [][]byte, i int) (root, proof []byte) {
+	if len(hashes) == 0 {
+		return
+	}
 	for len(hashes) > 1 {
 		n := len(hashes)
 		m := n / 2
@@ -65,6 +60,7 @@ func Proof(hashes [][]byte, i int) (proof []byte) {
 		}
 		hashes = hashes[:m]
 	}
+	root = hashes[0]
 	return
 }
 
