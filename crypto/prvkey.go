@@ -3,6 +3,7 @@ package crypto
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/likecoin-pro/likecoin/crypto/base58"
 	"github.com/likecoin-pro/likecoin/crypto/xhash"
 )
@@ -10,7 +11,8 @@ import (
 const PrivateKeyVersion = '\x01'
 
 type PrivateKey struct {
-	d         *big.Int
+	d *big.Int
+
 	PublicKey *PublicKey
 }
 
@@ -19,7 +21,7 @@ func newPrvKey(d *big.Int) *PrivateKey {
 	x, y := curve.ScalarBaseMult(d.Bytes())
 	return &PrivateKey{
 		d:         d,
-		PublicKey: &PublicKey{x, y},
+		PublicKey: &PublicKey{x: x, y: y},
 	}
 }
 
@@ -37,32 +39,19 @@ func (prv *PrivateKey) String() string {
 }
 
 func (prv *PrivateKey) Encode() []byte {
-	buf := []byte{PrivateKeyVersion} // head
-	return append(buf, intToBytes(prv.d)...)
+	buf := make([]byte, 1+KeySize)
+	buf[0] = PrivateKeyVersion // head
+	copy(buf[1:], intToBytes(prv.d))
+	return buf
 }
 
-// Sign signs a data using the private key, prv. It returns the signature as a
-// pair of integers. The security of the private key depends on the entropy of
-// rand.
-func (prv *PrivateKey) Sign(data []byte) []byte {
-	var k, s, r *big.Int
-	e := hashInt(data)
-	for {
-		for {
-			k = randInt()
-			r, _ = curve.ScalarBaseMult(k.Bytes())
-			r.Mod(r, curveParams.N)
-			if r.Sign() != 0 {
-				break
-			}
-		}
-		s = new(big.Int).Mul(prv.d, r)
-		s.Add(s, e)
-		s.Mul(s, fermatInverse(k, curveParams.N))
-		s.Mod(s, curveParams.N)
-		if s.Sign() != 0 {
-			break
-		}
+func (prv *PrivateKey) Sign(hash []byte) []byte {
+	if len(hash) != KeySize {
+		panic(errInvalidHashSize)
 	}
-	return append(intToBytes(r), intToBytes(s)...)
+	sig, err := secp256k1.Sign(hash, intToBytes(prv.d))
+	if err != nil {
+		panic(err)
+	}
+	return sig
 }

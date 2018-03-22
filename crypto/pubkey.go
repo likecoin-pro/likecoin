@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/likecoin-pro/likecoin/crypto/base58"
 	"golang.org/x/crypto/sha3"
 )
@@ -16,46 +17,9 @@ type PublicKey struct {
 }
 
 var (
-	errPublicKeyDecode = errors.New("crypto-error: incorrect length of public key")
+	errInvalidHashSize = errors.New("crypto: invalid hash length")
+	errPublicKeyDecode = errors.New("crypto: incorrect public key")
 )
-
-// Verify verifies the signature in r, s of hash using the public key, PublicKey. Its
-// return value records whether the signature is valid.
-func (pub *PublicKey) Verify(data []byte, sign []byte) bool {
-	if pub.Empty() {
-		return false
-	}
-	if len(sign) != PublicKeySize {
-		return false
-	}
-	r := new(big.Int).SetBytes(sign[:KeySize])
-	s := new(big.Int).SetBytes(sign[KeySize:])
-
-	if r.Sign() == 0 || r.Cmp(curveParams.N) >= 0 {
-		return false
-	}
-	if s.Sign() == 0 || s.Cmp(curveParams.N) >= 0 {
-		return false
-	}
-
-	e := hashInt(data)
-	w := new(big.Int).ModInverse(s, curveParams.N)
-
-	u1 := e.Mul(e, w)
-	u2 := w.Mul(r, w)
-
-	u1.Mod(u1, curveParams.N)
-	u2.Mod(u2, curveParams.N)
-
-	x1, y1 := curve.ScalarBaseMult(u1.Bytes())
-	x2, y2 := curve.ScalarMult(pub.x, pub.y, u2.Bytes())
-	x, y := curve.Add(x1, y1, x2, y2)
-	if x.Sign() == 0 && y.Sign() == 0 {
-		return false
-	}
-	x.Mod(x, curveParams.N)
-	return x.Cmp(r) == 0
-}
 
 func (pub *PublicKey) Empty() bool {
 	return pub == nil || pub.x == nil && pub.y == nil
@@ -77,19 +41,30 @@ func (pub *PublicKey) Address() Address {
 	return newAddress(h3[:AddressSize])
 }
 
+func (pub *PublicKey) ID() uint64 {
+	return pub.Address().ID()
+}
+
+func (pub *PublicKey) bytes() []byte {
+	x, y := pub.x.Bytes(), pub.y.Bytes()
+
+	ret := make([]byte, 1+2*KeySize)
+	ret[0] = 4 // uncompressed point
+	copy(ret[1+KeySize-len(x):], x)
+	copy(ret[1+2*KeySize-len(y):], y)
+	return ret
+}
+
 func (pub *PublicKey) Encode() []byte {
-	return append(
-		intToBytes(pub.x),    // 32 bytes X
-		intToBytes(pub.y)..., // 32 bytes Y
-	)
+	// compressed key
+	return secp256k1.CompressPubkey(pub.x, pub.y)
 }
 
 func (pub *PublicKey) Decode(data []byte) error {
-	if len(data) != PublicKeySize {
+	pub.x, pub.y = secp256k1.DecompressPubkey(data)
+	if pub.x == nil || pub.y == nil {
 		return errPublicKeyDecode
 	}
-	pub.x = new(big.Int).SetBytes(data[:KeySize])
-	pub.y = new(big.Int).SetBytes(data[KeySize:])
 	return nil
 }
 
@@ -111,6 +86,32 @@ func (pub *PublicKey) UnmarshalJSON(data []byte) error {
 	}
 }
 
+func (pub *PublicKey) Verify(hash []byte, sig []byte) bool {
+	if pub.Empty() || len(sig) != signatureSize || len(hash) != KeySize {
+		return false
+	}
+	return secp256k1.VerifySignature(pub.bytes(), hash, sig[:64])
+}
+
+func RecoverPublicKey(hash, sig []byte) (*PublicKey, error) {
+	if len(hash) != KeySize {
+		panic(errInvalidHashSize)
+	}
+	pub, err := secp256k1.RecoverPubkey(hash, sig)
+	if err != nil {
+		return nil, err
+	}
+	if len(pub) != 1+2*KeySize || pub[0] != 4 {
+		return nil, errPublicKeyDecode
+	}
+	x := new(big.Int).SetBytes(pub[1 : 1+KeySize])
+	y := new(big.Int).SetBytes(pub[1+KeySize:])
+	if x.Cmp(curveP) >= 0 || y.Cmp(curveP) >= 0 || !curve.IsOnCurve(x, y) {
+		return nil, errPublicKeyDecode
+	}
+	return &PublicKey{x, y}, nil
+}
+
 func MustParsePublicKey(pubkey string) *PublicKey {
 	if pub, err := ParsePublicKey(pubkey); err != nil {
 		panic(err)
@@ -120,7 +121,7 @@ func MustParsePublicKey(pubkey string) *PublicKey {
 }
 
 func ParsePublicKey(str64 string) (pub *PublicKey, err error) {
-	data, err := base58.DecodeFixed(str64, PublicKeySize)
+	data, err := base58.DecodeFixed(str64, publicKeySize)
 	if err != nil {
 		return
 	}
