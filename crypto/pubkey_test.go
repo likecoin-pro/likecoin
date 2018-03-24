@@ -7,66 +7,72 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var testPub = MustParsePublicKey("4pv2QxPs618pCCokGdD2U71A2ANfNc59i4xQavpKM9L3QjDw7mGLSzbrBkGmcjEzGJWTD6AadgmM9kZp8nssUyfa")
-
 func TestPublicKey_Encode(t *testing.T) {
+	pub := NewPrivateKey().PublicKey
 
-	buf := testPub.Encode()
+	buf := pub.Encode()
 
-	assert.Equal(t, PublicKeySize, len(buf))
+	assert.Equal(t, publicKeySize, len(buf))
 }
 
 func TestPublicKey_Decode(t *testing.T) {
-	buf := testPub.Encode()
+	pub1 := NewPrivateKey().PublicKey
+	buf := pub1.Encode()
 
-	var pub = new(PublicKey)
-	err := pub.Decode(buf)
+	var pub2 = new(PublicKey)
+	err := pub2.Decode(buf)
 
 	assert.NoError(t, err)
-	assert.True(t, testPub.Equal(pub))
-	assert.Equal(t, testPub, pub)
+	assert.True(t, pub1.Equal(pub2))
+	assert.Equal(t, pub1, pub2)
 }
 
 func TestDecodePublicKey(t *testing.T) {
-	buf := testPub.Encode()
+	pub1 := NewPrivateKey().PublicKey
+	buf := pub1.Encode()
 
-	pub, err := DecodePublicKey(buf)
+	pub2, err := DecodePublicKey(buf)
 
-	assert.Equal(t, testPub, pub)
 	assert.NoError(t, err)
+	assert.Equal(t, pub1, pub2)
 }
 
 func TestPublicKey_String(t *testing.T) {
+	pub := MustParsePublicKey("rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR")
 
-	str := testPub.String()
+	str := pub.String()
 
-	assert.Equal(t, "4pv2QxPs618pCCokGdD2U71A2ANfNc59i4xQavpKM9L3QjDw7mGLSzbrBkGmcjEzGJWTD6AadgmM9kZp8nssUyfa", str)
+	assert.Equal(t, "rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR", str)
 }
 
 func TestPublicKey_MarshalJSON(t *testing.T) {
+	pub := MustParsePublicKey("rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR")
 
-	data, err := json.Marshal(testPub)
+	data, err := json.Marshal(pub)
 
 	assert.NoError(t, err)
-	assert.Equal(t, `"4pv2QxPs618pCCokGdD2U71A2ANfNc59i4xQavpKM9L3QjDw7mGLSzbrBkGmcjEzGJWTD6AadgmM9kZp8nssUyfa"`, string(data))
+	assert.Equal(t, `"rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR"`, string(data))
 }
 
 func TestPublicKey_UnmarshalJSON(t *testing.T) {
-	buf, _ := json.Marshal(testPub)
+	pub1 := MustParsePublicKey("rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR")
+	buf, _ := json.Marshal(pub1)
 
-	var pub *PublicKey
-	err := json.Unmarshal(buf, &pub)
+	var pub2 *PublicKey
+	err := json.Unmarshal(buf, &pub2)
 
 	assert.NoError(t, err)
-	assert.Equal(t, testPub, pub)
-	assert.True(t, testPub.Equal(pub))
+	assert.Equal(t, pub1.x, pub2.x)
+	assert.Equal(t, pub1.y, pub2.y)
+	assert.Equal(t, pub1.Encode(), pub2.Encode())
+	assert.True(t, pub1.Equal(pub2))
 }
 
 func TestPublicKey_Is(t *testing.T) {
 	var pub0 *PublicKey
-	pub1 := MustParsePublicKey("4pv2QxPs618pCCokGdD2U71A2ANfNc59i4xQavpKM9L3QjDw7mGLSzbrBkGmcjEzGJWTD6AadgmM9kZp8nssUyfa")
-	pub2 := MustParsePublicKey("4pv2QxPs618pCCokGdD2U71A2ANfNc59i4xQavpKM9L3QjDw7mGLSzbrBkGmcjEzGJWTD6AadgmM9kZp8nssUyfa")
-	pub3 := MustParsePublicKey("5pv2QxPs618pCCokGdD2U71A2ANfNc59i4xQavpKM9L3QjDw7mGLSzbrBkGmcjEzGJWTD6AadgmM9kZp8nssUyfa")
+	pub1 := MustParsePublicKey("rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR")
+	pub2 := MustParsePublicKey("rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR")
+	pub3 := MustParsePublicKey("rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mS")
 
 	assert.True(t, pub1.Equal(pub2))
 	assert.True(t, pub1.Equal(pub2))
@@ -79,8 +85,9 @@ func TestPublicKey_Empty(t *testing.T) {
 
 	var pub1 *PublicKey
 	var pub2 = new(PublicKey)
+	var pub3 = MustParsePublicKey("rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR")
 
 	assert.True(t, pub1.Empty())
 	assert.True(t, pub2.Empty())
-	assert.True(t, !testPub.Empty())
+	assert.True(t, !pub3.Empty())
 }
