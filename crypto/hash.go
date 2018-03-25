@@ -16,15 +16,15 @@ func newHash256() hash.Hash {
 	return sha3.New256()
 }
 
+func Hash256Raw(data []byte) []byte {
+	return hash256(data)
+}
+
 func Hash256(values ...interface{}) []byte {
 	h := newHash256()
 	w := bin.NewWriter(h)
 	for _, val := range values {
-		if bb, ok := val.([]byte); ok {
-			w.Write(bb)
-		} else {
-			w.WriteVar(val)
-		}
+		w.WriteVar(val)
 	}
 	return h.Sum(nil)
 }
