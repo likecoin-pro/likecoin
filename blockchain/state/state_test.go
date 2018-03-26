@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
 	"github.com/likecoin-pro/likecoin/commons/enc"
 	"github.com/likecoin-pro/likecoin/crypto"
@@ -13,10 +14,10 @@ import (
 var (
 	coin = assets.LikeCoin
 
-	addr0 = crypto.MustParseAddress("Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK")
-	addrA = crypto.MustParseAddress("Like5eBiwK1JXRTsfNAAPN5GD6zwUWjdvu5y8JXRiLJ")
-	addrB = crypto.MustParseAddress("Like5T98kZKvq49awa7awjHWvD25wkJKMQD7g6Q5X9r")
-	addrC = crypto.MustParseAddress("Like5LtpZeGE5Ve5NbjCeraFVY5GCcTSFv9FYDzb7nm")
+	addr0 = crypto.MustParseAddress("Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrackwo")
+	addrA = crypto.MustParseAddress("Like3dr9gpykrrmGKVQ2PG2q6dz1x8rR5vnsdN1Zoac")
+	addrB = crypto.MustParseAddress("Like5ExPCt3qazqGeXLv3ZEDNNN51QDAbpdiJcCgYFn")
+	addrC = crypto.MustParseAddress("Like4Ug67n2CX2FLLFUdy24QNmzLAgFSgVwB7pmD4eL")
 )
 
 func exec(fn func()) (err error) {
@@ -54,12 +55,12 @@ func TestState_Get_(t *testing.T) {
 	c := NewState(0, nil).init(addr0, 123)
 	c.Get(coin, addr0)
 
-	assert.True(t, a.Equal(b))
-	assert.True(t, b.Equal(a))
-	assert.False(t, c.Equal(a))
+	assert.True(t, a.Values().Equal(b.Values()))
+	assert.True(t, b.Values().Equal(a.Values()))
+	assert.False(t, c.Values().Equal(a.Values()))
 }
 
-func TestState_Equal(t *testing.T) {
+func TestValues_Equal(t *testing.T) {
 
 	a := NewState(0, nil)
 	b := NewState(0, nil)
@@ -73,9 +74,9 @@ func TestState_Equal(t *testing.T) {
 	b.Increment(coin, addrA, Int(22), 0)
 	c.Increment(coin, addrA, Int(22), 0)
 
-	assert.True(t, a.Equal(b))
-	assert.True(t, b.Equal(a))
-	assert.False(t, c.Equal(a))
+	assert.True(t, a.Values().Equal(b.Values()))
+	assert.True(t, b.Values().Equal(a.Values()))
+	assert.False(t, c.Values().Equal(a.Values()))
 }
 
 func TestState_Increment(t *testing.T) {
@@ -111,61 +112,59 @@ func TestState_Decrement_fail(t *testing.T) {
 	assert.Equal(t, Int(9), vA)
 }
 
-func TestState_Encode(t *testing.T) {
+func TestValue_Encode(t *testing.T) {
 	s1 := NewState(0, nil).init(addr0, 12)
 	s1.Increment(coin, addrA, Int(34), 0)
 	s1.Increment(coin, addrB, Int(56), 0)
-	data1 := s1.Encode()
+	data1 := bin.Encode(s1.Values())
 
-	var s2 = new(State)
-	err2 := s2.Decode(data1)
-	data2 := s2.Encode()
+	var s2 Values
+	err2 := bin.Decode(data1, &s2)
+	data2 := bin.Encode(s2)
 
 	assert.NoError(t, err2)
 	assert.Equal(t, data1, data2)
 }
 
-func TestState_Decode(t *testing.T) {
+func TestValue_Decode(t *testing.T) {
 	s := NewState(0, nil).init(addrA, 10).init(addrB, 10)
 	s.Increment(coin, addr0, Int(1), 0)
 	s.Decrement(coin, addrA, Int(10), 0)
-	data := s.Encode() // encode only changed values
+	data := bin.Encode(s.Values())
 
-	st := NewState(0, nil)
-	err := st.Decode(data)
-	v0 := st.Get(coin, addr0)
-	vA := st.Get(coin, addrA)
-	vB := st.Get(coin, addrB)
+	var vv Values
+	err := bin.Decode(data, &vv)
 
 	assert.NoError(t, err)
-	assert.Equal(t, Int(1), v0)
-	assert.Equal(t, Int(0), vA)
-	assert.Equal(t, Int(0), vB) // 0 - because keyB is not imported
+	assert.Equal(t, Values{
+		{Address: addr0, Asset: coin, Balance: Int(1)},
+		{Address: addrA, Asset: coin, Balance: Int(0)},
+	}, vv)
 }
 
-func TestState_MarshalJSON(t *testing.T) {
+func TestValue_MarshalJSON(t *testing.T) {
 	st := NewState(0, nil).init(addrA, 123)
 	st.Increment(coin, addr0, Int(1), 111)
 	st.Get(coin, addrC)
 	st.Increment(coin, addrB, Int(100), 222)
 	st.Get(coin, addrA)
 
-	data, err := json.Marshal(st)
+	data, err := json.Marshal(st.Values())
 
 	assert.NoError(t, err)
 	assert.JSONEq(t, `[
 	  {
 		"chain": 0,
-		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK",
-		"asset":   "0001",
-		"total":   1,
+		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrackwo",
+		"asset":   "0x0001",
+		"balance":   1,
 		"tag":   111
 	  },
 	  {
 		"chain": 0,
-		"address": "Like5T98kZKvq49awa7awjHWvD25wkJKMQD7g6Q5X9r",
-		"asset":   "0001",
-		"total":   100,
+		"address": "Like5ExPCt3qazqGeXLv3ZEDNNN51QDAbpdiJcCgYFn",
+		"asset":   "0x0001",
+		"balance":   100,
 		"tag":   222
 	  }
 	]`, string(data))
@@ -188,30 +187,30 @@ func TestState_Values(t *testing.T) {
 	assert.JSONEq(t, `[
 	  {
 		"chain": 0,
-		"asset": "0001",
-		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK",
-		"total": 1,
+		"asset": "0x0001",
+		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrackwo",
+		"balance": 1,
 		"tag": 111
 	  },
 	  {
 		"chain": 0,
-		"asset": "0001",
-		"address": "Like5T98kZKvq49awa7awjHWvD25wkJKMQD7g6Q5X9r",
-		"total": 3,
+		"asset": "0x0001",
+		"address": "Like5ExPCt3qazqGeXLv3ZEDNNN51QDAbpdiJcCgYFn",
+		"balance": 3,
 		"tag": 222
 	  },
 	  {
 		"chain": 0,
-		"asset": "0001",
-		"address": "Like5T98kZKvq49awa7awjHWvD25wkJKMQD7g6Q5X9r",
-		"total": 0,
+		"asset": "0x0001",
+		"address": "Like5ExPCt3qazqGeXLv3ZEDNNN51QDAbpdiJcCgYFn",
+		"balance": 0,
 		"tag": 333
 	  },
 	  {
 		"chain": 0,
-		"asset": "0001",
-		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrZnWcK",
-		"total": 4,
+		"asset": "0x0001",
+		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrackwo",
+		"balance": 4,
 		"tag": 333
 	  }
 	]`, enc.JSON(values))
