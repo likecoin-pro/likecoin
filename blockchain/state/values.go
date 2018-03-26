@@ -21,5 +21,5 @@ func (vv Values) Hash() []byte {
 	for i, v := range vv {
 		hh[i] = v.Hash()
 	}
-	return merkle.Root(hh)
+	return merkle.Root(hh...)
 }
