@@ -76,12 +76,12 @@ func TestParseAddress_withTag2(t *testing.T) {
 }
 
 func TestParseAddress_withTagSuffix(t *testing.T) {
-	strAddr := "Like5A2PEu6eCHQzy1tMsa6b3kc1xXS7ywj2NQaSsgE0x666"
+	strAddr := "Like3dr9gpykrrmGKVQ2PG2q6dz1x8rR5vnsdN1Zoac0x666"
 
 	addr, tag, err := ParseAddress(strAddr)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "Like5A2PEu6eCHQzy1tMsa6b3kc1xXS7ywj2NQaSsgE", addr.String())
+	assert.Equal(t, "Like3dr9gpykrrmGKVQ2PG2q6dz1x8rR5vnsdN1Zoac", addr.String())
 	assert.EqualValues(t, 0x666, tag)
 }
 
