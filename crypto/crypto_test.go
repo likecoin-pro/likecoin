@@ -91,3 +91,20 @@ func TestRecoverPublicKey(t *testing.T) {
 	assert.True(t, pub1.Equal(pub2))
 	assert.True(t, verify)
 }
+
+func TestRecoverPublicKey2(t *testing.T) {
+	prv := NewPrivateKey()
+	pub1 := prv.PublicKey
+	hash := hash256([]byte("Test text"))
+	sign := prv.Sign(hash)
+
+	sign[34]++
+
+	fmt.Printf("PUB: %x\n", pub1.bytes())
+	pub2, err := RecoverPublicKey(hash, sign)
+	verify := pub2.Verify(hash, sign)
+
+	assert.NoError(t, err)
+	assert.True(t, verify)
+	//assert.True(t, pub1.Equal(pub2))
+}
