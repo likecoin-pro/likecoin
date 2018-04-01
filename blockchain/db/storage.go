@@ -12,15 +12,13 @@ import (
 	"github.com/likecoin-pro/likecoin/blockchain/state"
 	"github.com/likecoin-pro/likecoin/blockchain/transaction"
 	"github.com/likecoin-pro/likecoin/commons/hex"
-	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/crypto"
 	"github.com/likecoin-pro/likecoin/object"
 )
 
 type BlockchainStorage struct {
-	networkID int
 	chainID   uint64
-	storage   *goldb.Storage
+	db        *goldb.Storage
 	lastBlock *blockchain.Block
 
 	cacheBlock struct {
@@ -31,9 +29,10 @@ type BlockchainStorage struct {
 
 const (
 	// tables
-	dbTabBlock = 0x01 // (blockNum) => blockData
-	dbTabUsers = 0x02 // (userID) => txNum
-	//dbTabState = 0x03 // (asset, addr) => sateValue
+	dbTabBlock     = 0x01 // (blockNum) => blockData
+	dbTabUsers     = 0x02 // (userID) => txNum
+	dbTabStateTree = 0x03 // (asset, addr) => sateValue
+	dbTabChainTree = 0x04 // (asset, addr) => sateValue
 
 	// indexes
 	dbIdxTxID         = 0x10 // (txID)                        => txNum
@@ -51,13 +50,14 @@ var (
 	errUserNotFound          = errors.New("user not found")
 	errIncorrectTxParams     = errors.New("incorrect tx params")
 	errIncorrectTxState      = errors.New("incorrect tx state")
+	errIncorrectChainRoot    = errors.New("incorrect chain root")
+	errIncorrectStateRoot    = errors.New("incorrect state root")
 )
 
-func NewBlockchainStorage(networkID int, chainID uint64, dir string) (s *BlockchainStorage) {
+func NewBlockchainStorage(chainID uint64, dir string) (s *BlockchainStorage) {
 	s = &BlockchainStorage{
-		networkID: networkID,
-		chainID:   chainID,
-		storage:   goldb.NewStorage(dir, nil),
+		chainID: chainID,
+		db:      goldb.NewStorage(dir, nil),
 	}
 
 	b, err := s.getLastBlock()
@@ -70,25 +70,24 @@ func NewBlockchainStorage(networkID int, chainID uint64, dir string) (s *Blockch
 }
 
 func (s *BlockchainStorage) Close() (err error) {
-	return s.storage.Close()
+	return s.db.Close()
 }
 
 func (s *BlockchainStorage) Drop() (err error) {
-	s.storage.Close()
-	return s.storage.Drop()
+	s.db.Close()
+	return s.db.Drop()
 }
 
 // open db.transaction; verify block; save block and index-records
-func (s *BlockchainStorage) PutBlock(block *blockchain.Block) (err error) {
-	return s.storage.Exec(func(tr *goldb.Transaction) {
+func (s *BlockchainStorage) PutBlock(block *blockchain.Block, fVerifyTransactions bool) (err error) {
+	return s.db.Exec(func(tr *goldb.Transaction) {
 
 		// verify block headers
 		if err := block.VerifyHeader(s.lastBlock); err != nil {
 			tr.Fail(err) // dbTransaction fail
 		}
 
-		// put block
-		tr.PutVar(goldb.Key(dbTabBlock, block.Num), block)
+		stateTree := newPatriciaTree(tr, dbTabStateTree)
 
 		// add index on transactions
 		for _, it := range block.Items {
@@ -98,7 +97,7 @@ func (s *BlockchainStorage) PutBlock(block *blockchain.Block) (err error) {
 			txUID := it.UID()
 
 			// check tx-chain info
-			if h := tx.GetHeader(); h.Network != s.networkID || h.ChainID != s.chainID {
+			if h := tx.GetHeader(); h.ChainID != s.chainID {
 				tr.Fail(errIncorrectTxParams)
 			}
 
@@ -107,7 +106,7 @@ func (s *BlockchainStorage) PutBlock(block *blockchain.Block) (err error) {
 				tr.Fail(errTxHasBeenRegistered)
 			}
 
-			if config.VerifyTransactions {
+			if fVerifyTransactions {
 				//-- verify transaction data. (todo: ?? parallel verify)
 				if err := tx.Verify(); err != nil {
 					tr.Fail(err)
@@ -128,14 +127,14 @@ func (s *BlockchainStorage) PutBlock(block *blockchain.Block) (err error) {
 				}
 
 				// verify state
-				if !it.State.Equal(newState) {
+				if !it.State.Equal(newState.Values()) {
 					tr.Fail(errIncorrectTxState)
 				}
 			}
 
 			// handle user registration
 			if user, ok := tx.(*object.User); ok {
-				userID := user.ID()
+				userID := user.UserID()
 
 				// get user by userID
 				if usrTxUID, _ := tr.GetID(goldb.Key(dbTabUsers, userID)); usrTxUID != 0 {
@@ -150,7 +149,10 @@ func (s *BlockchainStorage) PutBlock(block *blockchain.Block) (err error) {
 			tr.PutVar(goldb.Key(dbIdxTxID, txID), txUID)
 
 			// save state to db-storage
-			for seq, v := range it.State.Values() {
+			for seq, v := range it.State {
+
+				stateTree.Put(v.Hash())
+
 				if v.ChainID == s.chainID {
 					tr.PutVar(goldb.Key(dbIdxAsset, v.Asset, txUID, seq, v.Address), v.Balance)
 
@@ -162,6 +164,21 @@ func (s *BlockchainStorage) PutBlock(block *blockchain.Block) (err error) {
 				}
 			}
 		}
+
+		// verify state root
+		if stateRoot, _ := stateTree.Root(); !bytes.Equal(block.StateRoot, stateRoot) {
+			tr.Fail(errIncorrectStateRoot)
+		}
+
+		// verify chain root
+		chainTree := newPatriciaTree(tr, dbTabChainTree)
+		chainTree.Put(block.Hash())
+		if chainRoot, _ := chainTree.Root(); !bytes.Equal(block.ChainRoot, chainRoot) {
+			tr.Fail(errIncorrectChainRoot)
+		}
+
+		// put block
+		tr.PutVar(goldb.Key(dbTabBlock, block.Num), block)
 
 		s.lastBlock = block // success; commit transaction; add block to blockchain
 	})
@@ -202,7 +219,7 @@ func (s *BlockchainStorage) GetBlock(num uint64) (block *blockchain.Block, err e
 
 	// get block from db-storage
 	block = new(blockchain.Block)
-	if ok, err := s.storage.GetVar(goldb.Key(dbTabBlock, num), block); err != nil {
+	if ok, err := s.db.GetVar(goldb.Key(dbTabBlock, num), block); err != nil {
 		return nil, err
 	} else if !ok {
 		return nil, errBlockNotFound
@@ -225,7 +242,7 @@ func (s *BlockchainStorage) FetchBlocks(offset uint64, limit int64, desc bool, f
 	if limit > 0 {
 		q.Limit(limit)
 	}
-	return s.storage.Fetch(q, func(rec goldb.Record) error {
+	return s.db.Fetch(q, func(rec goldb.Record) error {
 		var block = new(blockchain.Block)
 		rec.Decode(block)
 		return fn(block)
@@ -241,7 +258,7 @@ func (s *BlockchainStorage) TransactionByHash(txHash []byte) (*blockchain.BlockI
 }
 
 func (s *BlockchainStorage) TransactionByID(txID uint64) (*blockchain.BlockItem, error) {
-	if txUID, err := s.storage.GetID(goldb.Key(dbIdxTxID, txID)); err != nil {
+	if txUID, err := s.db.GetID(goldb.Key(dbIdxTxID, txID)); err != nil {
 		return nil, err
 	} else {
 		return s.TransactionByUID(txUID)
@@ -283,7 +300,7 @@ func (s *BlockchainStorage) fetchTxUID(
 	q.Order(orderDesc)
 	var txUID, lastBlock uint64
 	var nBlocks int64
-	return s.storage.Fetch(q, func(rec goldb.Record) error {
+	return s.db.Fetch(q, func(rec goldb.Record) error {
 		switch typ { // get txUID from record-key
 		case dbIdxAsset:
 			rec.DecodeKey(&asset, &txUID)
@@ -348,7 +365,7 @@ func (s *BlockchainStorage) QueryTransactions(
 	limitBlocks int64,
 	orderDesc bool,
 ) (txs []*blockchain.BlockItem, err error) {
-	err = s.FetchTransactions(asset, addr, filterTag, offsetBlock, 1, orderDesc, func(tx *blockchain.BlockItem, _ state.Number) error {
+	err = s.FetchTransactions(asset, addr, filterTag, offsetBlock, limitBlocks, orderDesc, func(tx *blockchain.BlockItem, _ state.Number) error {
 		txs = append(txs, tx)
 		return nil
 	})
@@ -356,7 +373,7 @@ func (s *BlockchainStorage) QueryTransactions(
 }
 
 func (s *BlockchainStorage) UserByID(userID uint64) (tx *blockchain.BlockItem, u *object.User, err error) {
-	txUID, err := s.storage.GetID(goldb.Key(dbTabUsers, userID))
+	txUID, err := s.db.GetID(goldb.Key(dbTabUsers, userID))
 	if err != nil {
 		return
 	}
@@ -380,7 +397,7 @@ func (s *BlockchainStorage) UserByNick(name string) (tx *blockchain.BlockItem, u
 
 func (s *BlockchainStorage) LastAssetAddress(asset assets.Asset) (addr crypto.Address, txUID uint64, val state.Number, err error) {
 	q := goldb.NewQuery(dbIdxAsset, asset).Last()
-	err = s.storage.Fetch(q, func(rec goldb.Record) error {
+	err = s.db.Fetch(q, func(rec goldb.Record) error {
 		rec.DecodeKey(&asset, &txUID, new(int), &addr)
 		val = rec.ValueBigInt()
 		return nil
@@ -413,7 +430,7 @@ type AddressInfo struct {
 	TaggedAddress string       `json:"address+tag"` // address+tag
 	Balance       state.Number `json:"balance"`     // balance on address (not tagged address)
 	Asset         assets.Asset `json:"asset"`       //
-	LastTxID      hex.Uint64   `json:"last_txid"`   // last tx of tagged_address
+	LastTx        hex.Bytes    `json:"last_tx"`     // last tx of tagged_address
 }
 
 func (s *BlockchainStorage) AddressInfo(addr crypto.Address, tag uint64, asset assets.Asset) (inf AddressInfo, err error) {
@@ -432,7 +449,7 @@ func (s *BlockchainStorage) AddressInfo(addr crypto.Address, tag uint64, asset a
 		}
 	}
 	if tx != nil {
-		inf.LastTxID = hex.Uint64(tx.TxID())
+		inf.LastTx = tx.TxHash()
 	}
 	return
 }
