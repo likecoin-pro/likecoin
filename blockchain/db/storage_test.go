@@ -1,120 +1,109 @@
 package db
 
 import (
-	"fmt"
-	"math/rand"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/likecoin-pro/likecoin/assets"
 	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
-	"github.com/likecoin-pro/likecoin/blockchain/tests"
 	"github.com/likecoin-pro/likecoin/blockchain/transaction"
 	"github.com/likecoin-pro/likecoin/commons/enc"
 	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/object"
+	"github.com/likecoin-pro/likecoin/tests"
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestBC() (*state.State, *BlockchainStorage) {
-	config.VerifyTransactions = true
-	config.NetworkID = 1 // test
-	config.ChainID = 1   //
-	bc := NewBlockchainStorage(config.NetworkID, config.ChainID, fmt.Sprintf("%s/test-db-%x", os.TempDir(), rand.Uint64()))
-	return state.NewState(config.ChainID, nil), bc
-}
-
 func TestBlockchainStorage_PutBlock(t *testing.T) {
-	st, bc := newTestBC()
-	defer bc.Drop()
+	c := newContext()
+	defer c.Drop()
 
 	// make block-1
-	b1 := blockchain.GenesisBlock().NewBlock()
-	b1.AddTx(st, tests.NewTestEmission(tests.AliceAddr, +100, tests.Coin))
-	b1.AddTx(st, tests.NewTestTransaction(tests.AliceKey, tests.BobAddr, 10, tests.Coin, "", 0))
-	b1.AddTx(st, tests.NewTestTransaction(tests.AliceKey, tests.CatAddr, 20, tests.Coin, "", 0))
-	b1.SetSign(tests.MasterKey)
-	err1 := bc.PutBlock(b1) // ok
+	b1, _ := c.NewBlock(
+		newTestEmission(tests.AliceAddr, +100, coin),
+		newTestTransfer(tests.AliceKey, tests.BobAddr, 10, coin, "", 0),
+		newTestTransfer(tests.AliceKey, tests.CatAddr, 20, coin, "", 0),
+	)
+	err1 := c.PutBlock(b1, true) // ok
 	assert.NoError(t, err1)
 
 	// make block-2
-	b2 := b1.NewBlock()
-	b2.AddTx(st, tests.NewTestTransaction(tests.AliceKey, tests.CatAddr, 5, tests.Coin, "", 0))
-	b2.SetSign(tests.MasterKey)
-	err2 := bc.PutBlock(b2) // ok
+	b2, _ := c.NewBlock(
+		newTestTransfer(tests.AliceKey, tests.CatAddr, 5, coin, "", 0),
+	)
+	err2 := c.PutBlock(b2, true) // ok
 	assert.NoError(t, err2)
 
 	// set incorrect state
-	st.Increment(tests.Coin, tests.AliceAddr, state.Int(1), 0)
+	c.state.Increment(tests.Coin, tests.AliceAddr, state.Int(1), 0)
 
 	// make invalid block-3
-	b3 := b2.NewBlock()
-	b3.AddTx(st, tests.NewTestTransaction(tests.AliceKey, tests.CatAddr, 10, tests.Coin, "", 0))
-	b3.SetSign(tests.MasterKey)
-	err3 := bc.PutBlock(b3) // fail
+	b3, _ := c.NewBlock(
+		newTestTransfer(tests.AliceKey, tests.CatAddr, 10, coin, "", 0),
+	)
+	err3 := c.PutBlock(b3, true) // fail
 	assert.Error(t, err3)
 }
 
 func TestBlockchainStorage_PutBlock_fail(t *testing.T) {
-	st, bc := newTestBC()
-	defer bc.Drop()
+	c := newContext()
+	defer c.Drop()
 
-	tx1 := tests.NewTestEmission(tests.AliceAddr, +100, tests.Coin)
-	tx2 := tests.NewTestEmission(tests.AliceAddr, +99, tests.Coin)
+	tx1 := newTestEmission(tests.AliceAddr, +100, coin)
+	tx2 := newTestEmission(tests.AliceAddr, +99, coin)
+
+	b0 := blockchain.GenesisBlock()
 
 	// put block#1
-	b1 := blockchain.GenesisBlock().NewBlock()
-	b1.AddTx(st, tx1)
-	b1.SetSign(tests.MasterKey)
-	err1 := bc.PutBlock(b1)
+	b1 := b0.NewBlock()
+	b1.AddTx(tx1, c.state, c.stateTree)
+	b1.SetSign(tests.MasterKey, c.chainTree)
+	err1 := c.PutBlock(b1, true)
 	assert.NoError(t, err1) // ok
 
 	// make second block#1
-	b2 := blockchain.GenesisBlock().NewBlock()
-	b2.AddTx(st, tx2)
-	b2.SetSign(tests.MasterKey)
-	err2 := bc.PutBlock(b2)
+	b2 := b0.NewBlock()
+	b2.AddTx(tx2, c.state, c.stateTree)
+	b2.SetSign(tests.MasterKey, c.chainTree)
+	err2 := c.PutBlock(b2, true)
 	assert.Error(t, err2) // fail
 
 	// make block#2 with duplicate tx1
 	b2 = b1.NewBlock()
-	b2.AddTx(st, tx1) // duplicate tx
-	b2.SetSign(tests.MasterKey)
-	err3 := bc.PutBlock(b2) // fail
+	b2.AddTx(tx1, c.state, c.stateTree) // duplicate tx
+	b2.SetSign(tests.MasterKey, c.chainTree)
+	err3 := c.PutBlock(b2, true) // fail
 	assert.Error(t, err3)
 
 	// make block#2 with invalid sign
 	b2 = b1.NewBlock()
-	b2.AddTx(st, tx2)          // ok
-	b2.SetSign(tests.AliceKey) // but bad sign
-	err4 := bc.PutBlock(b2)    // fail
+	b2.AddTx(tx2, c.state, c.stateTree)     // ok
+	b2.SetSign(tests.AliceKey, c.chainTree) // but bad sign
+	err4 := c.PutBlock(b2, true)            // fail
 	assert.Error(t, err4)
 }
 
 func TestBlockchainStorage_GetBlock(t *testing.T) {
-	st, bc := newTestBC()
-	defer bc.Drop()
+	c := newContext()
+	defer c.Drop()
 
 	// make block-1
-	b1 := blockchain.GenesisBlock().NewBlock()
-	b1.AddTx(st, tests.NewTestEmission(tests.AliceAddr, +100, tests.Coin))
-	b1.AddTx(st, tests.NewTestTransaction(tests.AliceKey, tests.BobAddr, 10, tests.Coin, "", 0))
-	b1.AddTx(st, tests.NewTestTransaction(tests.AliceKey, tests.CatAddr, 20, tests.Coin, "", 0))
-	b1.SetSign(tests.MasterKey)
-	bc.PutBlock(b1)
+	b1, _ := c.AddBlock(
+		newTestEmission(tests.AliceAddr, +100, coin),
+		newTestTransfer(tests.AliceKey, tests.BobAddr, 10, coin, "", 0),
+		newTestTransfer(tests.AliceKey, tests.CatAddr, 20, coin, "", 0),
+	)
 
 	// make block-2
-	b2 := b1.NewBlock()
-	b2.AddTx(st, tests.NewTestTransaction(tests.AliceKey, tests.CatAddr, 5, tests.Coin, "", 0))
-	b2.SetSign(tests.MasterKey)
-	bc.PutBlock(b2)
+	b2, _ := c.AddBlock(
+		newTestTransfer(tests.AliceKey, tests.CatAddr, 5, coin, "", 0),
+	)
 
-	B0, err0 := bc.GetBlock(0) // ok - genesis block
-	B1, err1 := bc.GetBlock(1) // ok
-	B2, err2 := bc.GetBlock(2) // ok
-	B3, err3 := bc.GetBlock(3) // empty
+	B0, err0 := c.GetBlock(0) // ok - genesis block
+	B1, err1 := c.GetBlock(1) // ok
+	B2, err2 := c.GetBlock(2) // ok
+	B3, err3 := c.GetBlock(3) // empty
 
 	assert.NoError(t, err0)
 	assert.NoError(t, err1)
@@ -130,31 +119,25 @@ func TestBlockchainStorage_GetBlock(t *testing.T) {
 }
 
 func TestBlockchainStorage_TxByID(t *testing.T) {
-	st, bc := newTestBC()
-	defer bc.Drop()
+	c := newContext()
+	defer c.Drop()
 
-	tx1 := tests.NewTestEmission(tests.AliceAddr, +100, tests.Coin)
-	tx2 := tests.NewTestTransaction(tests.AliceKey, tests.BobAddr, 10, tests.Coin, "", 0)
+	tx1 := newTestEmission(tests.AliceAddr, +100, coin)
+	tx2 := newTestTransfer(tests.AliceKey, tests.BobAddr, 10, coin, "", 0)
 
 	txID1 := transaction.TxID(tx1)
 	txID2 := transaction.TxID(tx2)
 
 	// make block#1
-	b1 := blockchain.GenesisBlock().NewBlock()
-	b1.AddTx(st, tx1)
-	b1.SetSign(tests.MasterKey)
-	bc.PutBlock(b1)
+	c.AddBlock(tx1)
 
 	// make block#2
-	b2 := b1.NewBlock()
-	b2.AddTx(st, tx2)
-	b2.SetSign(tests.MasterKey)
-	bc.PutBlock(b2)
+	c.AddBlock(tx2)
 
 	// get transactions by txID
-	it0, err0 := bc.TransactionByID(uint64(time.Now().UnixNano())) // fail
-	it1, err1 := bc.TransactionByID(txID1)                         // ok
-	it2, err2 := bc.TransactionByID(txID2)                         // ok
+	it0, err0 := c.TransactionByID(uint64(time.Now().UnixNano())) // fail
+	it1, err1 := c.TransactionByID(txID1)                         // ok
+	it2, err2 := c.TransactionByID(txID2)                         // ok
 
 	assert.Error(t, err0)
 	assert.Nil(t, it0)
@@ -167,29 +150,25 @@ func TestBlockchainStorage_TxByID(t *testing.T) {
 }
 
 func TestBlockchainStorage_FetchTxUID(t *testing.T) {
-	st, bc := newTestBC()
-	defer bc.Drop()
+	c := newContext()
+	defer c.Drop()
 
-	tx1 := tests.NewTestEmission(tests.AliceAddr, +100, tests.Coin)
-	tx2 := tests.NewTestTransaction(tests.AliceKey, tests.BobAddr, 10, tests.Coin, "", 0)
-	tx3 := tests.NewTestTransaction(tests.AliceKey, tests.CatAddr, 20, tests.Coin, "", 0)
+	tx1 := newTestEmission(tests.AliceAddr, +100, coin)
+	tx2 := newTestTransfer(tests.AliceKey, tests.BobAddr, 10, coin, "", 0)
+	tx3 := newTestTransfer(tests.AliceKey, tests.CatAddr, 20, coin, "", 0)
 
 	// make block#1
-	b1 := blockchain.GenesisBlock().NewBlock()
-	it1, _ := b1.AddTx(st, tx1)
-	b1.SetSign(tests.MasterKey)
-	bc.PutBlock(b1)
+	b1, _ := c.AddBlock(tx1)
+	it1 := b1.Items[0]
 
 	// make block#2
-	b2 := b1.NewBlock()
-	it2, _ := b2.AddTx(st, tx2)
-	it3, _ := b2.AddTx(st, tx3)
-	b2.SetSign(tests.MasterKey)
-	bc.PutBlock(b2)
+	b2, _ := c.AddBlock(tx2, tx3)
+	it2 := b2.Items[0]
+	it3 := b2.Items[1]
 
 	// get transaction-UIDs by address
 	var txUIDs []uint64
-	err := bc.fetchTxUID(tests.Coin, tests.AliceAddr, 0, 0, 0, false,
+	err := c.fetchTxUID(tests.Coin, tests.AliceAddr, 0, 0, 0, false,
 		func(txUID uint64, val state.Number) error {
 			txUIDs = append(txUIDs, txUID)
 			return nil
@@ -201,29 +180,19 @@ func TestBlockchainStorage_FetchTxUID(t *testing.T) {
 }
 
 func TestBlockchainStorage_FetchTransaction(t *testing.T) {
-	st, bc := newTestBC()
-	defer bc.Drop()
+	c := newContext()
+	defer c.Drop()
 
-	tx1 := tests.NewTestEmission(tests.AliceAddr, +100, tests.Coin)
-	tx2 := tests.NewTestTransaction(tests.AliceKey, tests.BobAddr, 10, tests.Coin, "", 0)
-	tx3 := tests.NewTestTransaction(tests.AliceKey, tests.CatAddr, 20, tests.Coin, "", 0)
+	tx1 := newTestEmission(tests.AliceAddr, +100, coin)
+	tx2 := newTestTransfer(tests.AliceKey, tests.BobAddr, 10, coin, "", 0)
+	tx3 := newTestTransfer(tests.AliceKey, tests.CatAddr, 20, coin, "", 0)
 
-	// make block#1
-	b1 := blockchain.GenesisBlock().NewBlock()
-	b1.AddTx(st, tx1)
-	b1.SetSign(tests.MasterKey)
-	bc.PutBlock(b1)
-
-	// make block#2
-	b2 := b1.NewBlock()
-	b2.AddTx(st, tx2)
-	b2.AddTx(st, tx3)
-	b2.SetSign(tests.MasterKey)
-	bc.PutBlock(b2)
+	c.AddBlock(tx1)      // make block#1
+	c.AddBlock(tx2, tx3) // make block#2
 
 	// get transactions by address
 	var txs []transaction.Transaction
-	err := bc.FetchTransactions(tests.Coin, tests.AliceAddr, 0, 0, 0, false,
+	err := c.FetchTransactions(tests.Coin, tests.AliceAddr, 0, 0, 0, false,
 		func(tx *blockchain.BlockItem, val state.Number) error {
 			txs = append(txs, tx.Tx)
 			return nil
@@ -235,25 +204,19 @@ func TestBlockchainStorage_FetchTransaction(t *testing.T) {
 }
 
 func TestBlockchainStorage_FetchTransactionByTag(t *testing.T) {
-	st, bc := newTestBC()
-	defer bc.Drop()
+	c := newContext()
+	defer c.Drop()
 
-	tx1 := tests.NewTestEmission(tests.AliceAddr, +100, tests.Coin)
-	tx2 := tests.NewTestTransaction(tests.AliceKey, tests.BobAddr, 10, tests.Coin, "", 222)
-	tx3 := tests.NewTestTransaction(tests.AliceKey, tests.CatAddr, 20, tests.Coin, "", 333)
-	tx4 := tests.NewTestTransaction(tests.AliceKey, tests.BobAddr, 30, tests.Coin, "", 222)
+	tx1 := newTestEmission(tests.AliceAddr, +100, coin)
+	tx2 := newTestTransfer(tests.AliceKey, tests.BobAddr, 10, coin, "", 222)
+	tx3 := newTestTransfer(tests.AliceKey, tests.CatAddr, 20, coin, "", 333)
+	tx4 := newTestTransfer(tests.AliceKey, tests.BobAddr, 30, coin, "", 222)
 
-	b1 := blockchain.GenesisBlock().NewBlock()
-	b1.AddTx(st, tx1)
-	b1.AddTx(st, tx2)
-	b1.AddTx(st, tx3)
-	b1.AddTx(st, tx4)
-	b1.SetSign(tests.MasterKey)
-	bc.PutBlock(b1)
+	c.AddBlock(tx1, tx2, tx3, tx4)
 
 	// get transactions by address and by tag <222>
 	var txs []transaction.Transaction
-	err := bc.FetchTransactions(tests.Coin, tests.AliceAddr, 222, 0, 0, false, func(tx *blockchain.BlockItem, _ state.Number) error {
+	err := c.FetchTransactions(tests.Coin, tests.AliceAddr, 222, 0, 0, false, func(tx *blockchain.BlockItem, _ state.Number) error {
 		txs = append(txs, tx.Tx)
 		return nil
 	})
@@ -263,37 +226,34 @@ func TestBlockchainStorage_FetchTransactionByTag(t *testing.T) {
 }
 
 func TestBlockchainStorage_NameOwner(t *testing.T) {
-	st, bc := newTestBC()
-	defer bc.Drop()
+	c := newContext()
+	defer c.Drop()
 
 	aliceName := assets.NewName("@alice")
 
 	// emission name
-	b := blockchain.GenesisBlock().NewBlock()
-	b.AddTx(st, tests.NewTestEmission(tests.AliceAddr, +1, aliceName))
-	b.SetSign(tests.MasterKey)
-	bc.PutBlock(b)
+	c.AddBlock(
+		newTestEmission(tests.AliceAddr, +1, aliceName),
+	)
 
 	// get owner of name
-	addr1, txUID1, err1 := bc.NameAddress("@alice")
+	addr1, txUID1, err1 := c.NameAddress("@alice")
 
 	// transfer name
-	b = b.NewBlock()
-	b.AddTx(st, tests.NewTestTransaction(tests.AliceKey, tests.BobAddr, 1, aliceName, "transfer @alice-name to Bob", 0))
-	b.SetSign(tests.MasterKey)
-	bc.PutBlock(b)
+	c.AddBlock(
+		newTestTransfer(tests.AliceKey, tests.BobAddr, 1, aliceName, "transfer @alice-name to Bob", 0),
+	)
 
 	// get new owner of name
-	addr2, txUID2, err2 := bc.NameAddress("@alice")
+	addr2, txUID2, err2 := c.NameAddress("@alice")
 
 	// second transfer name
-	b = b.NewBlock()
-	b.AddTx(st, tests.NewTestTransaction(tests.BobKey, tests.CatAddr, 1, aliceName, "transfer @alice-name to Cat", 0))
-	b.SetSign(tests.MasterKey)
-	bc.PutBlock(b)
+	c.AddBlock(
+		newTestTransfer(tests.BobKey, tests.CatAddr, 1, aliceName, "transfer @alice-name to Cat", 0),
+	)
 
 	// get new owner of name
-	addr3, txUID3, err3 := bc.NameAddress("@alice")
+	addr3, txUID3, err3 := c.NameAddress("@alice")
 
 	assert.NoError(t, err1)
 	assert.NoError(t, err2)
@@ -307,46 +267,44 @@ func TestBlockchainStorage_NameOwner(t *testing.T) {
 }
 
 func TestBlockchainStorage_UserByID(t *testing.T) {
-	st, bc := newTestBC()
-	defer bc.Drop()
+	c := newContext()
+	defer c.Drop()
 
 	// register users
-	b := blockchain.GenesisBlock().NewBlock()
-	b.AddTx(st, object.NewUser(tests.AliceKey, "alice", config.MasterPublicKey.ID(), nil))
-	b.AddTx(st, object.NewUser(tests.BobKey, "bob", tests.AliceID, nil))
-	b.AddTx(st, object.NewUser(tests.CatKey, "cat", tests.AliceID, nil))
-	b.SetSign(tests.MasterKey)
-	err := bc.PutBlock(b)
+	_, err := c.AddBlock(
+		object.NewUser(tests.AliceKey, "alice", config.MasterPublicKey.ID(), nil),
+		object.NewUser(tests.BobKey, "bob", tests.AliceID, nil),
+		object.NewUser(tests.CatKey, "cat", tests.AliceID, nil),
+	)
 	assert.NoError(t, err)
 
 	// get user by ID
-	tx, user, err := bc.UserByID(tests.AliceID)
+	tx, user, err := c.UserByID(tests.AliceID)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "alice", user.Nick)
-	assert.Equal(t, tests.AliceID, user.ID())
+	assert.Equal(t, tests.AliceID, user.UserID())
 	assert.Equal(t, tests.AliceAddr, user.Address())
 	assert.Equal(t, uint64(0x100000000), tx.UID())
 }
 
 func TestBlockchainStorage_UserByNick(t *testing.T) {
-	st, bc := newTestBC()
-	defer bc.Drop()
+	c := newContext()
+	defer c.Drop()
 
 	// register users
-	b := blockchain.GenesisBlock().NewBlock()
-	b.AddTx(st, object.NewUser(tests.AliceKey, "alice", config.MasterPublicKey.ID(), nil))
-	b.AddTx(st, object.NewUser(tests.BobKey, "bob", tests.AliceID, nil))
-	b.AddTx(st, object.NewUser(tests.CatKey, "cat", tests.AliceID, nil))
-	b.SetSign(tests.MasterKey)
-	bc.PutBlock(b)
+	c.AddBlock(
+		object.NewUser(tests.AliceKey, "alice", config.MasterPublicKey.ID(), nil),
+		object.NewUser(tests.BobKey, "bob", tests.AliceID, nil),
+		object.NewUser(tests.CatKey, "cat", tests.AliceID, nil),
+	)
 
 	// get user by name
-	tx, user, err := bc.UserByNick("bob")
+	tx, user, err := c.UserByNick("bob")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "bob", user.Nick)
-	assert.Equal(t, tests.BobID, user.ID())
+	assert.Equal(t, tests.BobID, user.UserID())
 	assert.Equal(t, tests.BobAddr, user.Address())
 	assert.Equal(t, uint64(0x100000001), tx.UID())
 }
