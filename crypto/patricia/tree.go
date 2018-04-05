@@ -12,8 +12,9 @@ type Storage interface {
 }
 
 type Tree struct {
-	db   Storage
-	root []byte
+	db     Storage
+	keyPfx []byte
+	root   []byte
 }
 
 var (
@@ -21,11 +22,11 @@ var (
 	errInvalidNodeData = errors.New("patricia: invalid tree-node data")
 )
 
-func NewTree(db Storage) *Tree {
+func NewTree(db Storage, keyPfx []byte) *Tree {
 	if db == nil {
 		db = MemoryStorage{}
 	}
-	return &Tree{db: db}
+	return &Tree{db: db, keyPfx: keyPfx}
 }
 
 func (t *Tree) Root() (root []byte, err error) {
@@ -51,7 +52,7 @@ func (t *Tree) GetProof(key []byte) ([]byte, error) {
 
 //--------------------------------------------------
 func (t *Tree) getNode(key []byte) (nd *node, err error) {
-	data, err := t.db.Get(key)
+	data, err := t.db.Get(t.dbKey(key))
 	if err != nil {
 		return
 	}
@@ -69,6 +70,13 @@ func idx(key []byte, lv int) uint8 {
 	} else {
 		return key[lv/2] & 0x0f
 	}
+}
+
+func (t *Tree) dbKey(key []byte) []byte {
+	if len(t.keyPfx) == 0 {
+		return key
+	}
+	return append(t.keyPfx, key...)
 }
 
 func (t *Tree) put(path, key []byte) (newHash []byte, err error) {
@@ -97,7 +105,7 @@ func (t *Tree) put(path, key []byte) (newHash []byte, err error) {
 			return
 		}
 	}
-	err = t.db.Put(path, nd.encode())
+	err = t.db.Put(t.dbKey(path), nd.encode())
 	return nd.hash(), err
 }
 
