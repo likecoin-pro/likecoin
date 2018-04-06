@@ -10,7 +10,7 @@ import (
 )
 
 func TestTree_Root(t *testing.T) {
-	tree := NewTree(nil)
+	tree := NewTree(nil, nil)
 	for _, v := range randSlice(10000) {
 		tree.Put(v)
 	}
@@ -21,8 +21,8 @@ func TestTree_Root(t *testing.T) {
 }
 
 func TestTree_Put(t *testing.T) {
-	a := NewTree(nil)
-	b := NewTree(nil)
+	a := NewTree(nil, nil)
+	b := NewTree(nil, nil)
 
 	for _, v := range randSlice(10000) {
 		a.Put(v)
@@ -39,7 +39,7 @@ func TestTree_Put(t *testing.T) {
 }
 
 func TestTree_GetProof(t *testing.T) {
-	a := NewTree(nil)
+	a := NewTree(nil, nil)
 	keys := randSlice(10000)
 	for _, v := range keys {
 		a.Put(v)
