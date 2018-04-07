@@ -10,28 +10,32 @@ import (
 )
 
 type Header struct {
-	Type    Type              `json:"type"`      // tx type
-	Version int               `json:"version"`   // tx version
-	Network int               `json:"network"`   //
-	ChainID uint64            `json:"chain"`     //
-	Sender  *crypto.PublicKey `json:"sender"`    //
-	Nonce   uint64            `json:"nonce"`     //
-	Sign    hex.Bytes         `json:"signature"` //
+	Type    Type      `json:"type"`    // tx type
+	Version int       `json:"version"` // tx version
+	Network int       `json:"network"` //
+	ChainID uint64    `json:"chain"`   //
+	Nonce   uint64    `json:"nonce"`   //
+	Sig     hex.Bytes `json:"sig"`     // tx signature
+
+	// not imported fields
+	Sender *crypto.PublicKey `json:"sender"` // sender of tx (get from signature)
 }
 
-var ErrTxIncorrectSign = errors.New("transaction: Incorrect signature")
+var ErrTxIncorrectSig = errors.New("transaction: Incorrect signature")
 
-func (h *Header) InitHeader(txType Type, txVersion int) {
-	h.Type = txType
-	h.Version = txVersion
-	h.Network = config.NetworkID
-	h.ChainID = config.ChainID
+func NewHeader(txType Type, txVersion int) Header {
+	return Header{
+		Type:    txType,
+		Version: txVersion,
+		Network: config.NetworkID,
+		ChainID: config.ChainID,
+	}
 }
 
-func (h *Header) SetSign(tx Transaction, prv *crypto.PrivateKey) {
+func (h *Header) Sign(tx Transaction, prv *crypto.PrivateKey) {
 	//h.Nonce = 0
 	h.Sender = prv.PublicKey
-	h.Sign = prv.Sign(tx.Hash())
+	h.Sig = prv.Sign(tx.Hash())
 }
 
 func (h *Header) GetHeader() *Header {
@@ -56,7 +60,6 @@ func (h *Header) HeaderHash() []byte {
 		h.Version,
 		h.Network,
 		h.ChainID,
-		h.Sender,
 		h.Nonce,
 	)
 }
@@ -67,9 +70,8 @@ func (h Header) Encode() []byte {
 		h.Version,
 		h.Network,
 		h.ChainID,
-		h.Sender,
 		h.Nonce,
-		h.Sign,
+		h.Sig,
 	)
 }
 func (h *Header) Decode(data []byte) error {
@@ -78,15 +80,25 @@ func (h *Header) Decode(data []byte) error {
 		&h.Version,
 		&h.Network,
 		&h.ChainID,
-		&h.Sender,
 		&h.Nonce,
-		&h.Sign,
+		&h.Sig,
 	)
 }
 
-func (h *Header) VerifySign(tx Transaction) error {
-	if !h.Sender.Verify(tx.Hash(), h.Sign) {
-		return ErrTxIncorrectSign
+// recoverSender recovers sender`s pubkey from signature
+func (h *Header) recoverSender(tx Transaction) (err error) {
+	h.Sender, err = crypto.RecoverPublicKey(tx.Hash(), h.Sig)
+	return
+}
+
+func (h *Header) VerifySign(tx Transaction) (err error) {
+	if h.Sender == nil {
+		if err = h.recoverSender(tx); err != nil {
+			return
+		}
+	}
+	if !h.Sender.Verify(tx.Hash(), h.Sig) {
+		return ErrTxIncorrectSig
 	}
 	return nil
 }
