@@ -13,6 +13,7 @@ import (
 	"github.com/likecoin-pro/likecoin/blockchain/transaction"
 	"github.com/likecoin-pro/likecoin/commons/hex"
 	"github.com/likecoin-pro/likecoin/crypto"
+	"github.com/likecoin-pro/likecoin/crypto/patricia"
 	"github.com/likecoin-pro/likecoin/object"
 )
 
@@ -76,6 +77,18 @@ func (s *BlockchainStorage) Close() (err error) {
 func (s *BlockchainStorage) Drop() (err error) {
 	s.db.Close()
 	return s.db.Drop()
+}
+
+func newPatriciaTree(db patricia.Storage, tab goldb.Entity) *patricia.Tree {
+	return patricia.NewTree(db, goldb.Key(tab))
+}
+
+func (s *BlockchainStorage) ChainTree() *patricia.Tree {
+	return newPatriciaTree(s.db, dbTabChainTree)
+}
+
+func (s *BlockchainStorage) StateTree() *patricia.Tree {
+	return newPatriciaTree(s.db, dbTabStateTree)
 }
 
 // open db.transaction; verify block; save block and index-records
