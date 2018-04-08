@@ -88,6 +88,7 @@ func Decode(data []byte) (tx Transaction, err error) {
 	}
 	if tx, _ = newTxByType(tx0.Header.Type); tx != nil {
 		err = tx.Decode(data)
+		tx.GetHeader().Sender = tx0.Sender
 	} else {
 		tx = tx0
 	}
