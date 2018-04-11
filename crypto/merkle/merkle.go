@@ -34,7 +34,7 @@ func Root(hashes ...[]byte) []byte {
 	return hashes[0]
 }
 
-func Proof(hashes [][]byte, i int) (root, proof []byte) {
+func Proof(hashes [][]byte, i int) (proof, root []byte) {
 	if len(hashes) == 0 {
 		return
 	}
@@ -64,10 +64,10 @@ func Proof(hashes [][]byte, i int) (root, proof []byte) {
 	return
 }
 
-func Verify(key, root, proof []byte) bool {
+func GetProofRoot(key, proof []byte) (root []byte) {
 	for len(proof) > 0 {
 		if len(proof) < HashSize+1 {
-			return false
+			return nil
 		}
 		if proof[0] == 0 {
 			key = hash(key, proof[1:HashSize+1])
@@ -76,5 +76,10 @@ func Verify(key, root, proof []byte) bool {
 		}
 		proof = proof[HashSize+1:]
 	}
-	return bytes.Equal(key, root)
+	return key
+}
+
+func Verify(key, proof, root []byte) bool {
+	r := GetProofRoot(key, proof)
+	return r != nil && bytes.Equal(r, root)
 }

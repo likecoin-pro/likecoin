@@ -19,7 +19,7 @@ func TestRoot(t *testing.T) {
 func TestProof(t *testing.T) {
 	hashes := newHashes(15)
 
-	root, proof := Proof(hashes, 4)
+	proof, root := Proof(hashes, 4)
 
 	assert.Equal(t, ""+
 		"004f5aa6aec3fc78c6aae081ac8120c720efcd6cea84b6925e607be063716f96dd"+
@@ -35,9 +35,9 @@ func TestVerify(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		hashes := newHashes(100)
 		hash := hashes[i]
-		root, proof := Proof(hashes, i)
+		proof, root := Proof(hashes, i)
 
-		ok := Verify(hash, root, proof)
+		ok := Verify(hash, proof, root)
 
 		assert.True(t, ok)
 	}
@@ -45,10 +45,10 @@ func TestVerify(t *testing.T) {
 
 func TestVerify_fail(t *testing.T) {
 	hashes := newHashes(100)
-	root, proof := Proof(hashes, 13)
+	proof, root := Proof(hashes, 13)
 
 	proof = proof[:len(proof)-1] // corrupt proof (cut last byte)
-	ok := Verify(hashes[13], root, proof)
+	ok := Verify(hashes[13], proof, root)
 
 	assert.False(t, ok)
 }
