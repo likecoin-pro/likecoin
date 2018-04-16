@@ -31,7 +31,7 @@ func (nd *node) proof(iHash int) []byte {
 			hh = append(hh, b)
 		}
 	}
-	_, proof := merkle.Proof(hh, idx)
+	proof, _ := merkle.Proof(hh, idx)
 	return proof
 }
 

@@ -15,10 +15,12 @@ type Tree struct {
 	db     Storage
 	keyPfx []byte
 	root   []byte
+	puts   map[string]*node
 }
 
 var (
 	errKeyNotFound     = errors.New("patricia: key not found tree-node data")
+	errKeyHasExists    = errors.New("patricia: key has exists")
 	errInvalidNodeData = errors.New("patricia: invalid tree-node data")
 )
 
@@ -42,16 +44,61 @@ func (t *Tree) Root() (root []byte, err error) {
 }
 
 func (t *Tree) Put(key []byte) (err error) {
-	t.root, err = t.put(make([]byte, 0, 10), key)
+	t.puts = map[string]*node{}
+	defer func() {
+		t.puts = nil
+	}()
+
+	root, err := t.put(make([]byte, 0, 10), key)
+	if err != nil {
+		return
+	}
+
+	// save to db
+	for path, nd := range t.puts {
+		err = t.db.Put(t.dbKey([]byte(path)), nd.encode())
+		if err != nil {
+			return
+		}
+	}
+
+	// success
+	t.root = root
 	return
 }
 
-func (t *Tree) GetProof(key []byte) ([]byte, error) {
-	return t.proof(make([]byte, 0, 10), key)
+func (t *Tree) GetProof(key []byte) (proof, root []byte, err error) {
+	if proof, err = t.proof(make([]byte, 0, 10), key); err != nil {
+		return
+	}
+	root, err = t.Root()
+	return
+}
+
+func (t *Tree) AppendingProof(newKey []byte) (proof, root []byte, err error) {
+	t.puts = map[string]*node{}
+	defer func() {
+		t.puts = nil
+	}()
+	buf := make([]byte, 0, 10)
+	root, err = t.put(buf, newKey)
+	if err != nil {
+		return
+	}
+	proof, err = t.proof(buf, newKey)
+	if err != nil {
+		return
+	}
+	return
 }
 
 //--------------------------------------------------
 func (t *Tree) getNode(key []byte) (nd *node, err error) {
+	if t.puts != nil {
+		if nd, ok := t.puts[string(key)]; ok {
+			return nd, nil
+		}
+	}
 	data, err := t.db.Get(t.dbKey(key))
 	if err != nil {
 		return
@@ -87,10 +134,10 @@ func (t *Tree) put(path, key []byte) (newHash []byte, err error) {
 		nd = &node{val: key}
 	} else {
 		lv := len(path)
-		if len(nd.val) != 0 {
+		if nd.val != nil {
 			val := nd.val
 			if bytes.Equal(val, key) {
-				return nd.hash(), nil
+				return nil, errKeyHasExists
 			}
 			i := idx(val, lv)
 			nd.val = nil
@@ -105,7 +152,7 @@ func (t *Tree) put(path, key []byte) (newHash []byte, err error) {
 			return
 		}
 	}
-	err = t.db.Put(t.dbKey(path), nd.encode())
+	t.puts[string(path)] = nd
 	return nd.hash(), err
 }
 
