@@ -40,21 +40,73 @@ func TestTree_Put(t *testing.T) {
 
 func TestTree_GetProof(t *testing.T) {
 	a := NewTree(nil, nil)
-	keys := randSlice(10000)
-	for _, v := range keys {
-		a.Put(v)
-	}
-	root, _ := a.Root()
+	keys := randSlice(5000)
 
 	for _, key := range keys {
-
-		proof, err := a.GetProof(key)
-
-		ok := merkle.Verify(key, root, proof)
-
+		err := a.Put(key)
 		assert.NoError(t, err)
-		assert.True(t, len(proof) > 0)
+
+		proof, root, err := a.GetProof(key)
+		assert.NoError(t, err)
+
+		ok := merkle.Verify(key, proof, root)
 		assert.True(t, ok)
+	}
+
+	for _, key := range keys {
+		err := a.Put(key)
+		assert.Error(t, err)
+		assert.Equal(t, errKeyHasExists, err)
+
+		proof, root, err := a.GetProof(key)
+		assert.NoError(t, err)
+
+		ok := merkle.Verify(key, proof, root)
+		assert.True(t, ok)
+	}
+}
+
+func TestTree_AppendingProof(t *testing.T) {
+	a := NewTree(nil, nil)
+	keys := randSlice(5000)
+
+	for i, key := range keys {
+
+		root1, err := a.Root()
+		assert.NoError(t, err)
+
+		// get appending key proof and new root
+		proof2A, root2A, err := a.AppendingProof(key)
+		assert.NoError(t, err)
+		assert.NotEqual(t, root1, root2A) // new root
+		if i > 0 {
+			assert.True(t, len(proof2A) > 0)
+		}
+
+		// verify proof
+		ok := merkle.Verify(key, proof2A, root2A)
+		assert.True(t, ok)
+
+		// check root; root is not changed
+		root1A, err := a.Root()
+		assert.NoError(t, err)
+		assert.Equal(t, root1, root1A)
+
+		// insert new key
+		err = a.Put(key)
+		assert.NoError(t, err)
+
+		// get new root
+		root2, err := a.Root()
+		assert.NoError(t, err)
+		assert.Equal(t, root2A, root2)
+
+		// get new proof
+		proof2B, root2B, err := a.GetProof(key)
+		assert.NoError(t, err)
+		assert.Equal(t, proof2A, proof2B)
+		assert.Equal(t, root2A, root2B)
+		assert.Equal(t, root2, root2B)
 	}
 }
 
