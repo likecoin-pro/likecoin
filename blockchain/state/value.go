@@ -3,6 +3,7 @@ package state
 import (
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
+	"github.com/likecoin-pro/likecoin/commons/enc"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
@@ -10,8 +11,12 @@ type Value struct {
 	ChainID uint64         `json:"chain"`
 	Asset   assets.Asset   `json:"asset"`
 	Address crypto.Address `json:"address"`
-	Tag     int64          `json:"tag"`
 	Balance Number         `json:"balance"`
+	Tag     uint64         `json:"tag"`
+}
+
+func (v *Value) String() string {
+	return enc.JSON(v)
 }
 
 func (v *Value) Equal(b *Value) bool {
