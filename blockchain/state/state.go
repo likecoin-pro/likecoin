@@ -3,7 +3,6 @@ package state
 import (
 	"errors"
 	"math/big"
-	"sync"
 
 	"github.com/likecoin-pro/likecoin/assets"
 	"github.com/likecoin-pro/likecoin/crypto"
@@ -14,8 +13,7 @@ type State struct {
 	getter  func(assets.Asset, crypto.Address) Number //
 
 	vals map[string]Number //
-	sets []*Value          //
-	mx   sync.Mutex        // execution mutex
+	sets Values            //
 }
 
 var (
@@ -30,6 +28,10 @@ func NewState(chainID uint64, getter func(assets.Asset, crypto.Address) Number) 
 		getter:  getter,
 		vals:    map[string]Number{},
 	}
+}
+
+func (s *State) NewSubState() *State {
+	return NewState(s.chainID, s.Get)
 }
 
 func (s *State) Copy() *State {
@@ -74,15 +76,21 @@ func (s *State) set(v *Value) {
 	s.sets = append(s.sets, v)
 }
 
-func (s *State) Set(asset assets.Asset, addr crypto.Address, v Number, tag int64) {
-	s.set(&Value{s.chainID, asset, addr, tag, v})
+func (s *State) Apply(vv Values) {
+	for _, v := range vv {
+		s.set(v)
+	}
 }
 
-func (s *State) CrossChainSet(chainID uint64, asset assets.Asset, addr crypto.Address, v Number, tag int64) {
-	s.set(&Value{chainID, asset, addr, tag, v})
+func (s *State) Set(asset assets.Asset, addr crypto.Address, v Number, tag uint64) {
+	s.set(&Value{s.chainID, asset, addr, v, tag})
 }
 
-func (s *State) Increment(asset assets.Asset, addr crypto.Address, delta Number, tag int64) {
+func (s *State) CrossChainSet(chainID uint64, asset assets.Asset, addr crypto.Address, v Number, tag uint64) {
+	s.set(&Value{chainID, asset, addr, v, tag})
+}
+
+func (s *State) Increment(asset assets.Asset, addr crypto.Address, delta Number, tag uint64) {
 	if delta.Sign() == 0 {
 		return
 	}
@@ -91,35 +99,11 @@ func (s *State) Increment(asset assets.Asset, addr crypto.Address, delta Number,
 	s.Set(asset, addr, v, tag)
 }
 
-func (s *State) Decrement(asset assets.Asset, addr crypto.Address, delta Number, tag int64) {
+func (s *State) Decrement(asset assets.Asset, addr crypto.Address, delta Number, tag uint64) {
 	v := new(big.Int).Neg(delta)
 	s.Increment(asset, addr, v, tag)
 }
 
 func (s *State) Fail(err error) {
 	panic(err)
-}
-
-type Transaction interface {
-	Execute(*State)
-}
-
-func (s *State) Execute(tx Transaction) (newState *State, err error) {
-
-	s.mx.Lock()
-	defer s.mx.Unlock()
-	defer func() {
-		err, _ = recover().(error)
-	}()
-
-	newState = NewState(s.chainID, s.Get)
-
-	tx.Execute(newState)
-
-	// set on success
-	for _, v := range newState.sets {
-		s.set(v)
-	}
-
-	return
 }
