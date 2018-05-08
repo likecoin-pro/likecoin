@@ -64,7 +64,7 @@ func Proof(hashes [][]byte, i int) (proof, root []byte) {
 	return
 }
 
-func GetProofRoot(key, proof []byte) (root []byte) {
+func ProofRoot(key, proof []byte) (root []byte) {
 	for len(proof) > 0 {
 		if len(proof) < HashSize+1 {
 			return nil
@@ -80,6 +80,6 @@ func GetProofRoot(key, proof []byte) (root []byte) {
 }
 
 func Verify(key, proof, root []byte) bool {
-	r := GetProofRoot(key, proof)
+	r := ProofRoot(key, proof)
 	return r != nil && bytes.Equal(r, root)
 }
