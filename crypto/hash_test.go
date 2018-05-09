@@ -11,7 +11,7 @@ func TestHash256(t *testing.T) {
 	a, b, c := 1, 2, 3
 
 	h1 := Hash256(a, b, c)
-	h2 := Hash256Raw(bin.Encode(a, b, c))
+	h2 := HashSum256(bin.Encode(a, b, c))
 
 	assert.Equal(t, h1, h2)
 }
