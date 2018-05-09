@@ -26,7 +26,7 @@ var (
 )
 
 func init() {
-	SetLogLevel(LevelInfo)
+	SetLogLevel(LevelTrace)
 }
 
 func newLogger(prefix string) *log.Logger {
