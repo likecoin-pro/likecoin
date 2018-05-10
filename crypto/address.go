@@ -12,14 +12,14 @@ import (
 )
 
 const (
-	AddressSize = 24 // 192 bits
+	AddressLength = 24 // 192 bits
 
 	addressPrefix = "Like"
 	addressVer    = 0x01
 	checksumLen   = 3
 )
 
-type Address [AddressSize]byte
+type Address [AddressLength]byte
 
 var NilAddress Address
 
@@ -31,10 +31,10 @@ var (
 )
 
 func newAddress(data []byte) (addr Address) {
-	if len(data) != AddressSize {
+	if len(data) != AddressLength {
 		panic(errAddrInvalidLength)
 	}
-	copy(addr[:], data[:AddressSize])
+	copy(addr[:], data[:AddressLength])
 	return
 }
 
@@ -66,10 +66,10 @@ func (addr *Address) Decode(data []byte) error {
 		*addr = Address{}
 		return nil
 	}
-	if len(data) != AddressSize {
+	if len(data) != AddressLength {
 		return errAddrInvalidLength
 	}
-	copy(addr[:], data[:AddressSize])
+	copy(addr[:], data[:AddressLength])
 	return nil
 }
 
@@ -79,7 +79,7 @@ func addrCheckSum(addr []byte, tag uint64) []byte {
 	h.Write([]byte{addressVer})
 	h.Write(addr)
 	h.Write(bin.Uint64ToBytes(tag))
-	return hash256(h.Sum(nil))[:checksumLen]
+	return HashSum256(h.Sum(nil))[:checksumLen]
 }
 
 func (addr Address) TaggedString(tag uint64) string {

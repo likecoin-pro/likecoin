@@ -1,14 +1,14 @@
 package crypto
 
 import (
-	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/likecoin-pro/likecoin/crypto/base58"
-	"golang.org/x/crypto/sha3"
 )
 
 type PublicKey struct {
@@ -29,16 +29,25 @@ func (pub *PublicKey) String() string {
 	return base58.Encode(pub.Encode())
 }
 
+func (pub *PublicKey) Hex() string {
+	return hex.EncodeToString(pub.bytes()[1:])
+}
+
 func (pub *PublicKey) Equal(p *PublicKey) bool {
 	return pub != nil && p != nil && pub.x.Cmp(p.x) == 0 && pub.y.Cmp(p.y) == 0
 }
 
 func (pub *PublicKey) Address() Address {
-	h2 := sha256.New()
-	h2.Write(intToBytes(pub.x))
-	h2.Write(intToBytes(pub.y))
-	h3 := sha3.Sum512(h2.Sum(nil))
-	return newAddress(h3[:AddressSize])
+	h1 := sha3.NewKeccak512()
+	h1.Write(intToBytes(pub.x))
+	h1.Write(intToBytes(pub.y))
+	result := h1.Sum(nil)
+
+	h2 := sha3.NewKeccak256()
+	h2.Write(result)
+	result = h2.Sum(nil)
+
+	return newAddress(result[32-AddressLength:])
 }
 
 func (pub *PublicKey) ID() uint64 {
