@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"encoding/hex"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
@@ -34,8 +35,20 @@ func NewPrivateKeyBySecret(secret string) *PrivateKey {
 	return newPrvKey(normInt(key))
 }
 
+func ParsePrivateKeyHex(hexKey string) (prv *PrivateKey, err error) {
+	data, err := hex.DecodeString(hexKey)
+	if err != nil {
+		return
+	}
+	return newPrvKey(new(big.Int).SetBytes(data)), nil
+}
+
 func (prv *PrivateKey) String() string {
 	return base58.Encode(prv.Encode())
+}
+
+func (prv *PrivateKey) Hex() string {
+	return hex.EncodeToString(prv.Encode()[1:])
 }
 
 func (prv *PrivateKey) Encode() []byte {
