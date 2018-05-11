@@ -22,10 +22,6 @@ KJUR.crypto.ECDSA.parseSigHex = function(signHex) {
         s: new BigInteger(signHex.substr(ecdsaKeyLen), 16)
     }
 };
-function PrivateKeyBySecret(secret) {
-    const hash = XHash(secret).toString();
-    return normInt(hash.substring(0, ecdsaKeyLen)).toString();
-}
 function PublicKeyByPrivate(prvHex) {
     const m = ecdsa.ecparams.G.multiply(new BigInteger(prvHex, 16));
     return ("000000000000000" + m.getX().toBigInteger().toString(16)).slice(-ecdsaKeyLen)
