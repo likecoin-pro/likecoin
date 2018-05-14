@@ -2,7 +2,7 @@ package blockchain
 
 import "github.com/likecoin-pro/likecoin/config"
 
-var genesisBlockHeader = &BlockHeader{
+var genesisBlock = &Block{
 	Version:   0,
 	Num:       0,
 	ChainID:   1,
@@ -13,8 +13,8 @@ var genesisBlockHeader = &BlockHeader{
 	Miner:     config.MasterPublicKey,
 }
 
-var genesisBlockHeaderHash = genesisBlockHeader.Hash()
+var genesisBlockHash = genesisBlock.Hash()
 
 func GenesisBlock() *Block {
-	return &Block{BlockHeader: genesisBlockHeader}
+	return genesisBlock
 }

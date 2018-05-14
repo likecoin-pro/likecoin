@@ -5,95 +5,185 @@ import (
 
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
-	"github.com/likecoin-pro/likecoin/blockchain/transaction"
+	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/crypto"
 	"github.com/likecoin-pro/likecoin/crypto/merkle"
+	"github.com/likecoin-pro/likecoin/crypto/patricia"
 )
 
 type Block struct {
-	*BlockHeader
-	Items []*BlockItem `json:"txs"`
+	Version   int       `json:"version"`       // version
+	ChainID   uint64    `json:"chain"`         //
+	Num       uint64    `json:"height"`        // number of block in blockchain
+	Timestamp int64     `json:"timestamp"`     // timestamp of block in µsec
+	PrevHash  bin.Bytes `json:"previous_hash"` // hash of previous block
+	TxRoot    bin.Bytes `json:"tx_root"`       // merkle root of block-transactions
+	StateRoot bin.Bytes `json:"state_root"`    // patricia root of global state
+	ChainRoot bin.Bytes `json:"chain_root"`    // patricia root of chain
+
+	// miner params
+	Nonce uint64            `json:"nonce"` //
+	Miner *crypto.PublicKey `json:"miner"` // miner public-key
+	Sig   bin.Bytes         `json:"sig"`   // miner signature  := minerKey.Sign( blockHash + chainRoot )
+
+	// reserved
+	Reserved1 []byte `json:"-"`
+	Reserved2 []byte `json:"-"`
+	Reserved3 []byte `json:"-"`
 }
 
-func (b *Block) NewBlock() *Block {
-	return &Block{
-		BlockHeader: &BlockHeader{
-			Version:  0,
-			ChainID:  b.ChainID,
-			Num:      b.Num + 1,
-			PrevHash: b.Hash(),
-		},
+func NewBlock(
+	pre *Block,
+	txs []*BlockTx,
+	prv *crypto.PrivateKey,
+	state *state.State,
+	chainTree *patricia.Tree,
+) (block *Block, err error) {
+
+	for _, bTx := range txs {
+		bTx.StateUpdates, err = bTx.Tx.Execute(state)
+		if err != nil {
+			return
+		}
+		state.Apply(bTx.StateUpdates)
 	}
+
+	block = &Block{
+		Version:   0,
+		ChainID:   pre.ChainID,
+		Num:       pre.Num + 1,
+		PrevHash:  pre.Hash(),
+		TxRoot:    pre.txRoot(txs),
+		Timestamp: timestamp(),
+		Nonce:     0,
+		Miner:     prv.PublicKey,
+	}
+
+	err = chainTree.Put(block.Hash())
+	if err != nil {
+		return nil, err
+	}
+	block.ChainRoot, err = chainTree.Root()
+	if err != nil {
+		return nil, err
+	}
+
+	// set signature( b.Hash + chainRoot )
+	block.Sig = prv.Sign(block.sigHash())
+
+	return
 }
 
-func (b *Block) VerifyHeader(pre *Block) error {
+// block.Hash + chainRoot
+func (b *Block) sigHash() []byte {
+	return merkle.Root(b.Hash(), b.ChainRoot)
+}
 
-	if len(b.Items) == 0 {
+func (b *Block) Hash() []byte {
+	return crypto.Hash256(
+		b.Version,
+		b.ChainID,
+		b.Num,
+		b.Timestamp,
+		b.PrevHash,
+		b.TxRoot,
+		b.StateRoot,
+		b.Nonce,
+		b.Miner,
+		b.Reserved1,
+		b.Reserved2,
+		b.Reserved3,
+	)
+}
+
+// Size returns block-header size
+func (b *Block) Size() int64 {
+	return int64(len(b.Encode()))
+}
+
+func (b *Block) Encode() []byte {
+	return bin.Encode(
+		b.Version,
+		b.ChainID,
+		b.Num,
+		b.Timestamp,
+		b.PrevHash,
+		b.TxRoot,
+		b.StateRoot,
+		b.ChainRoot,
+		b.Nonce,
+		b.Miner,
+		b.Reserved1,
+		b.Reserved2,
+		b.Reserved3,
+		b.Sig,
+	)
+}
+
+func (b *Block) Decode(data []byte) (err error) {
+	return bin.Decode(data,
+		&b.Version,
+		&b.ChainID,
+		&b.Num,
+		&b.Timestamp,
+		&b.PrevHash,
+		&b.TxRoot,
+		&b.StateRoot,
+		&b.ChainRoot,
+		&b.Nonce,
+		&b.Miner,
+		&b.Reserved1,
+		&b.Reserved2,
+		&b.Reserved3,
+		&b.Sig,
+	)
+}
+
+func (b *Block) Verify(pre *Block) error {
+	blockHash := b.Hash()
+	if b.Num == 0 && bytes.Equal(blockHash, genesisBlockHash) { // is genesis
+		return ErrInvalidGenesisBlock
+	}
+	if pre != nil {
+		if b.ChainID != pre.ChainID {
+			return ErrInvalidChainID
+		}
+		if b.Num != pre.Num+1 {
+			return ErrInvalidNum
+		}
+		if !bytes.Equal(b.PrevHash, pre.Hash()) {
+			return ErrInvalidPrevHash
+		}
+	}
+	if b.Miner.Empty() {
+		return ErrEmptyNodeKey
+	}
+	if !b.Miner.Equal(config.MasterPublicKey) {
+		return ErrInvalidNodeKey
+	}
+	if !b.Miner.Verify(b.sigHash(), b.Sig) {
+		return ErrInvalidSign
+	}
+	return nil
+}
+
+func (b *Block) VerifyTxs(txs []*BlockTx) error {
+
+	if len(txs) == 0 {
 		return ErrEmptyBlock
 	}
-	if !bytes.Equal(b.TxRoot, b.txRoot()) {
-		return ErrInvalidMerkleRoot
-	}
 
-	// verify block header
-	if err := b.BlockHeader.Verify(pre.BlockHeader); err != nil {
-		return err
+	if txRoot := b.txRoot(txs); !bytes.Equal(b.TxRoot, txRoot) {
+		return ErrInvalidMerkleRoot
 	}
 
 	return nil
 }
 
-func (b *Block) txRoot() []byte {
+func (b *Block) txRoot(txs []*BlockTx) []byte {
 	var hh [][]byte
-	for _, it := range b.Items {
+	for _, it := range txs {
 		hh = append(hh, it.Hash())
 	}
-	return merkle.Root(hh)
-}
-
-func (b *Block) AddTx(st *state.State, tx transaction.Transaction) (it *BlockItem, err error) {
-	txState, err := st.Execute(tx)
-	if err != nil {
-		return
-	}
-	it = &BlockItem{
-		Tx:    tx,
-		State: txState,
-
-		block:    b,
-		blockIdx: len(b.Items),
-	}
-	b.Items = append(b.Items, it)
-	return
-}
-
-func (b *Block) SetSign(prv *crypto.PrivateKey) {
-	b.TxRoot = b.txRoot()
-	b.Timestamp = timestamp()
-	b.Nonce = 0
-	b.Miner = prv.PublicKey
-	b.Sign = prv.Sign(b.Hash())
-}
-
-func (b *Block) Size() int {
-	return len(b.Encode())
-}
-
-func (b *Block) Encode() []byte {
-	return bin.Encode(
-		b.BlockHeader,
-		b.Items,
-	)
-}
-
-func (b *Block) Decode(data []byte) error {
-	err := bin.Decode(data,
-		&b.BlockHeader,
-		&b.Items,
-	)
-	for i, it := range b.Items {
-		it.block = b
-		it.blockIdx = i
-	}
-	return err
+	return merkle.Root(hh...)
 }
