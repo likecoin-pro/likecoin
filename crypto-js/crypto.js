@@ -1,16 +1,8 @@
 
-const SHA256 = CryptoJS.SHA256;
-const SHA512 = CryptoJS.SHA512;
-const latin1 = CryptoJS.enc.Latin1;
-const hex = CryptoJS.enc.Hex;
 const ecdsa = new KJUR.crypto.ECDSA({curve: "secp256k1"});
 const ecdsaKeyLen = ecdsa.ecparams.keylen / 4;
 
 const crypto = {
-
-    shake512: function(data) {
-        return shake256.create(512).update(data).toString();
-    },
 
     hash: function(data) {
         return shake256.create(256).update(data).toString();
@@ -44,7 +36,7 @@ const crypto = {
     },
 
     addressByPublic: function(pubHex) {
-        let h = hex2arr(pubHex);
+        let h = hexToArray(pubHex);
         h = shake256.create(512).update(h).array();
         h = shake256.create(512).update(h);
         return "0x"+h.toString().slice(-48);
@@ -52,12 +44,12 @@ const crypto = {
 
 };
 
-function cutHexPrefix(s) {
+function trimHexPrefix(s) {
     return s.substr(0, 2)==="0x"? s.substr(2) : s;
 }
 
-function hex2arr(s) {
-    s = cutHexPrefix(s);
+function hexToArray(s) {
+    s = trimHexPrefix(s);
     const n = s.length>>1;
     const a = new Array(n);
     for(let i=0; i<n; i++) a[i]=parseInt(s.substr(i<<1, 2), 16);
@@ -65,7 +57,7 @@ function hex2arr(s) {
 }
 
 function newBigInt(s) {
-    return new BigInteger(cutHexPrefix(s), 16);
+    return new BigInteger(trimHexPrefix(s), 16);
 }
 
 function normInt(b) {
