@@ -19,9 +19,9 @@ const crypto = {
             for(let i=0;i<64;i++) if(a[i]!==b[i]) return a[i]<b[i]? -1 : 1;
             return 0;
         });
-        const h = shake256.create(512);
-        for(let i=0;i<n;i++) h.update(a[i]);
-        return h.toString();
+        const h512 = shake256.create(512);
+        for(let i=0;i<n;i++) h512.update(a[i]);
+        return h512.toString();
     },
 
     privateKeyBySecret: function(secret) {
