@@ -7,11 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestXHash(t *testing.T) {
+	key := XHash([]byte("abc"))
+
+	assert.Equal(t, "d85f68a0dd6b2ebeb5a60b47b70d2e4b63a842ac0510116e2d52f153e535cd60635f76fd52b34cceb671e0ed11093e923c39ee1a5ff32088ebf5f2415a285eef", hex.EncodeToString(key))
+}
+
 func TestGenerateKey(t *testing.T) {
 	key := GenerateKeyByPassword("abc", 512)
 
-	assert.Equal(t,
-		"6c23f9a5fc3609c74a37e2fb7982653c97e39f00a8f700f99e3b770bb872bd8b9b819d546a2cf5a2aebc10a28f75886a76ccc8c4f1ec8999652c9bb31ec8c8a7",
-		hex.EncodeToString(key),
-	)
+	assert.Equal(t, "d85f68a0dd6b2ebeb5a60b47b70d2e4b63a842ac0510116e2d52f153e535cd60635f76fd52b34cceb671e0ed11093e923c39ee1a5ff32088ebf5f2415a285eef", hex.EncodeToString(key))
 }
