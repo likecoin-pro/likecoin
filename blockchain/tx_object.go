@@ -15,9 +15,9 @@ type TxObject interface {
 }
 
 var (
-	txTypes     = map[Type]reflect.Type{}
-	txTypeNames = map[Type]string{}
-	txObjTypes  = map[reflect.Type]Type{}
+	txTypes    = map[TxType]reflect.Type{}
+	txTypeStr  = map[TxType]string{}
+	txObjTypes = map[reflect.Type]TxType{}
 )
 
 var (
@@ -25,7 +25,7 @@ var (
 	errTxTypeHasRegistered = errors.New("transaction type has been registered")
 )
 
-func RegisterTxObject(txType Type, txObj TxObject) error {
+func RegisterTxObject(txType TxType, txObj TxObject) error {
 	if _, ok := txTypes[txType]; ok {
 		panic(errTxTypeHasRegistered)
 	}
@@ -34,12 +34,16 @@ func RegisterTxObject(txType Type, txObj TxObject) error {
 		typ = typ.Elem()
 	}
 	txTypes[txType] = typ
-	txTypeNames[txType] = typ.Name()
+	txTypeStr[txType] = typ.Name()
 	txObjTypes[typ] = txType
 	return nil
 }
 
-func typeByObject(obj TxObject) Type {
+func TxTypeStr(typ TxType) string {
+	return txTypeStr[typ]
+}
+
+func typeByObject(obj TxObject) TxType {
 	typ := reflect.TypeOf(obj)
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
@@ -47,7 +51,7 @@ func typeByObject(obj TxObject) Type {
 	return txObjTypes[typ]
 }
 
-func newObjectByType(typ Type) (TxObject, error) {
+func newObjectByType(typ TxType) (TxObject, error) {
 	rt, ok := txTypes[typ]
 	if !ok {
 		return nil, ErrUnsupportedTxType

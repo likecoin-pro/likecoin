@@ -1,15 +1,13 @@
 package blockchain
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strconv"
-
-	"encoding/json"
-
 	"time"
 
-	"fmt"
+	"bytes"
 
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
@@ -18,10 +16,10 @@ import (
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
-type Type = uint8
+type TxType = uint8
 
 type Transaction struct {
-	Type    Type              // tx type
+	Type    TxType            // tx type
 	Version int               // tx version
 	Network int               //
 	ChainID uint64            //
@@ -34,7 +32,7 @@ type Transaction struct {
 }
 
 type transactionJSON struct {
-	Type    Type              `json:"type"`    // tx type
+	Type    TxType            `json:"type"`    // tx type
 	Version int               `json:"version"` // tx version
 	Network int               `json:"network"` //
 	ChainID uint64            `json:"chain"`   //
@@ -89,10 +87,12 @@ func (tx *Transaction) Size() int {
 }
 
 func (tx *Transaction) StrType() string {
-	return fmt.Sprintf("tx-%d", tx.Type)
+	return TxTypeStr(tx.Type)
 }
 
-// todo: exclude sender for saving tx to DB
+func (tx *Transaction) Equal(tx1 *Transaction) bool {
+	return bytes.Equal(tx.Encode(), tx1.Encode())
+}
 
 func (tx *Transaction) Encode() []byte {
 	if len(tx.Data) == 0 {
