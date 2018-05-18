@@ -17,9 +17,8 @@ type State struct {
 }
 
 var (
-	//errIncrement = errors.New("blockchain/state-error: increment error")
-	ErrNegativeValue = errors.New("blockchain/state-error: not enough funds")
-	ErrInvalidKey    = errors.New("blockchain/state-error: invalid key")
+	ErrNegativeValue = errors.New("blockchain/state: not enough funds")
+	ErrInvalidKey    = errors.New("blockchain/state: invalid key")
 )
 
 func NewState(chainID uint64, getter func(assets.Asset, crypto.Address) Number) *State {

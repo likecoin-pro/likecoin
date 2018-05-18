@@ -14,10 +14,10 @@ import (
 var (
 	coin = assets.LikeCoin
 
-	addr0 = crypto.MustParseAddress("Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrackwo")
-	addrA = crypto.MustParseAddress("Like3dr9gpykrrmGKVQ2PG2q6dz1x8rR5vnsdN1Zoac")
-	addrB = crypto.MustParseAddress("Like5ExPCt3qazqGeXLv3ZEDNNN51QDAbpdiJcCgYFn")
-	addrC = crypto.MustParseAddress("Like4Ug67n2CX2FLLFUdy24QNmzLAgFSgVwB7pmD4eL")
+	addr0 = crypto.MustParseAddress("Like5QU4UiVeh7459hiRPJZfh9AhoFN29Pn9bwwSGvJ")
+	addrA = crypto.MustParseAddress("Like46j9pghNTUaxd2zRbJfruQt8U9AWMd3Rb5bJxLj")
+	addrB = crypto.MustParseAddress("Like3mJ34d7obc37tS1Rx4aqtZdPew3n61xwTeWV9Am")
+	addrC = crypto.MustParseAddress("Like52qhrYBtJp5k8dDhYJw1p34E97SQicrjDrRp3Fj")
 )
 
 func exec(fn func()) (err error) {
@@ -155,14 +155,14 @@ func TestValue_MarshalJSON(t *testing.T) {
 	assert.JSONEq(t, `[
 	  {
 		"chain": 0,
-		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrackwo",
+		"address": "Like5QU4UiVeh7459hiRPJZfh9AhoFN29Pn9bwwSGvJ",
 		"asset":   "0x0001",
 		"balance":   1,
 		"tag":   111
 	  },
 	  {
 		"chain": 0,
-		"address": "Like5ExPCt3qazqGeXLv3ZEDNNN51QDAbpdiJcCgYFn",
+		"address": "Like3mJ34d7obc37tS1Rx4aqtZdPew3n61xwTeWV9Am",
 		"asset":   "0x0001",
 		"balance":   100,
 		"tag":   222
@@ -188,28 +188,28 @@ func TestState_Values(t *testing.T) {
 	  {
 		"chain": 0,
 		"asset": "0x0001",
-		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrackwo",
+		"address": "Like5QU4UiVeh7459hiRPJZfh9AhoFN29Pn9bwwSGvJ",
 		"balance": 1,
 		"tag": 111
 	  },
 	  {
 		"chain": 0,
 		"asset": "0x0001",
-		"address": "Like5ExPCt3qazqGeXLv3ZEDNNN51QDAbpdiJcCgYFn",
+		"address": "Like3mJ34d7obc37tS1Rx4aqtZdPew3n61xwTeWV9Am",
 		"balance": 3,
 		"tag": 222
 	  },
 	  {
 		"chain": 0,
 		"asset": "0x0001",
-		"address": "Like5ExPCt3qazqGeXLv3ZEDNNN51QDAbpdiJcCgYFn",
+		"address": "Like3mJ34d7obc37tS1Rx4aqtZdPew3n61xwTeWV9Am",
 		"balance": 0,
 		"tag": 333
 	  },
 	  {
 		"chain": 0,
 		"asset": "0x0001",
-		"address": "Like3m1UbktLcKpr2uLihHakhREPX23xUgdChrackwo",
+		"address": "Like5QU4UiVeh7459hiRPJZfh9AhoFN29Pn9bwwSGvJ",
 		"balance": 4,
 		"tag": 333
 	  }
