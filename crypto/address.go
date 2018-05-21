@@ -7,8 +7,11 @@ import (
 	"strconv"
 	"strings"
 
+	"encoding/hex"
+
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/crypto/base58"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -54,6 +57,10 @@ func (addr Address) ID() uint64 {
 	return bin.BytesToUint64(addr[:8])
 }
 
+func (addr Address) Hex() string {
+	return "0x" + hex.EncodeToString(addr[:])
+}
+
 func (addr Address) Encode() []byte {
 	if addr.IsNil() {
 		return nil
@@ -74,12 +81,14 @@ func (addr *Address) Decode(data []byte) error {
 }
 
 func addrCheckSum(addr []byte, tag uint64) []byte {
-	h := newHash256()
-	h.Write([]byte(addressPrefix))
-	h.Write([]byte{addressVer})
-	h.Write(addr)
-	h.Write(bin.Uint64ToBytes(tag))
-	return HashSum256(h.Sum(nil))[:checksumLen]
+	sha := sha3.NewShake256()
+	sha.Write([]byte(addressPrefix))
+	sha.Write([]byte{addressVer})
+	sha.Write(addr)
+	sha.Write(bin.Uint64ToBytes(tag))
+	var h [checksumLen]byte
+	sha.Read(h[:])
+	return h[:]
 }
 
 func (addr Address) TaggedString(tag uint64) string {
@@ -103,6 +112,10 @@ func (addr *Address) UnmarshalJSON(data []byte) (err error) {
 	if err = json.Unmarshal(data, &s); err != nil {
 		return
 	}
+	if s == "" { // nil addr
+		*addr = NilAddress
+		return nil
+	}
 	if a, _, err := ParseAddress(s); err != nil {
 		return err
 	} else {
@@ -112,12 +125,28 @@ func (addr *Address) UnmarshalJSON(data []byte) (err error) {
 }
 
 func ParseAddress(strAddr string) (addr Address, tag uint64, err error) {
+	defer func() {
+		if err != nil {
+			addr = NilAddress
+		}
+	}()
+
+	// hex format of address
+	if strings.HasPrefix(strAddr, "0x") {
+		if buf, e := hex.DecodeString(strAddr[2:]); e == nil && (len(buf) == AddressLength || len(buf) == AddressLength+8) {
+			copy(addr[:], buf[:AddressLength])
+			tag = bin.BytesToUint64(buf[AddressLength:])
+		} else {
+			err = errParseAddrInvalid
+		}
+		return
+	}
 
 	if i := strings.Index(strAddr, "0"); i > 0 {
 		if addr, _, err = ParseAddress(strAddr[:i]); err != nil {
 			return
 		}
-		tag, err = strconv.ParseUint(strAddr[i:], 0, 64)
+		tag, err = strconv.ParseUint(strAddr[i:], 16, 64)
 		return
 	}
 
