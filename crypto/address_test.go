@@ -75,13 +75,13 @@ func TestParseAddress_withTag2(t *testing.T) {
 	}
 }
 
-func TestParseAddress_withPrimitiveTagSuffix(t *testing.T) {
-	strAddr := "Like3dr9gpykrrmGKVQ2PG2q6dz1x8rR5vnsdN1eGFb0x666"
+func TestParseAddress_withSimpleTagSuffix(t *testing.T) {
+	strAddr := "Like5DuaVTk8KgpRh98xDvHvnpaAWxSoYh6uLRvyar50666"
 
 	addr, tag, err := ParseAddress(strAddr)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "Like3dr9gpykrrmGKVQ2PG2q6dz1x8rR5vnsdN1eGFb", addr.String())
+	assert.Equal(t, "Like5DuaVTk8KgpRh98xDvHvnpaAWxSoYh6uLRvyar5", addr.String())
 	assert.EqualValues(t, 0x666, tag)
 }
 
