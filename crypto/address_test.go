@@ -94,6 +94,30 @@ func TestParseAddress_fail(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestAddress_Hex(t *testing.T) {
+	addr := MustParseAddress("Like5DuaVTk8KgpRh98xDvHvnpaAWxSoYh6uLRvyar5")
+
+	s := addr.Hex()
+
+	assert.Equal(t, "0x9a8a9d2b5766b5c3962f4dd301c01765bdc37a6387f24250", s)
+}
+
+func TestParseAddress_hex(t *testing.T) {
+	addr, tag, err := ParseAddress("0x9a8a9d2b5766b5c3962f4dd301c01765bdc37a6387f24250")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "Like5DuaVTk8KgpRh98xDvHvnpaAWxSoYh6uLRvyar5", addr.String())
+	assert.EqualValues(t, 0, tag)
+}
+
+func TestParseAddress_hex_tag(t *testing.T) {
+	addr, tag, err := ParseAddress("0x9a8a9d2b5766b5c3962f4dd301c01765bdc37a6387f242500123456789abcdef")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "Like5DuaVTk8KgpRh98xDvHvnpaAWxSoYh6uLRvyar5", addr.String())
+	assert.EqualValues(t, 0x0123456789abcdef, tag)
+}
+
 func TestAddress_Encode_nilAddress(t *testing.T) {
 	var addr Address
 
