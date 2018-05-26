@@ -4,8 +4,9 @@ import (
 	"encoding/hex"
 	"math/big"
 
+	"strings"
+
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	"github.com/likecoin-pro/likecoin/crypto/base58"
 	"github.com/likecoin-pro/likecoin/crypto/xhash"
 )
 
@@ -35,20 +36,12 @@ func NewPrivateKeyBySecret(secret string) *PrivateKey {
 	return newPrvKey(normInt(key))
 }
 
-func ParsePrivateKeyHex(hexKey string) (prv *PrivateKey, err error) {
-	data, err := hex.DecodeString(hexKey)
-	if err != nil {
-		return
-	}
-	return newPrvKey(new(big.Int).SetBytes(data)), nil
-}
-
 func (prv *PrivateKey) String() string {
-	return base58.Encode(prv.Encode())
+	return prv.Hex()
 }
 
 func (prv *PrivateKey) Hex() string {
-	return hex.EncodeToString(prv.Encode()[1:])
+	return "0x" + hex.EncodeToString(prv.Encode())
 }
 
 func (prv *PrivateKey) Encode() []byte {
@@ -67,4 +60,21 @@ func (prv *PrivateKey) Sign(hash []byte) []byte {
 		panic(err)
 	}
 	return sig
+}
+
+func ParsePrivateKey(hexKey string) (prv *PrivateKey, err error) {
+	hexKey = strings.TrimPrefix(hexKey, "0x")
+	data, err := hex.DecodeString(hexKey)
+	if err != nil {
+		return
+	}
+	return newPrvKey(new(big.Int).SetBytes(data[1:])), nil
+}
+
+func MustParsePrivateKey(hexKey string) *PrivateKey {
+	prv, err := ParsePrivateKey(hexKey)
+	if err != nil {
+		panic(err)
+	}
+	return prv
 }
