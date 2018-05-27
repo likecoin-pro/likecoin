@@ -30,7 +30,7 @@ func (pub *PublicKey) String() string {
 }
 
 func (pub *PublicKey) Hex() string {
-	return hex.EncodeToString(pub.bytes()[1:])
+	return "0x" + hex.EncodeToString(pub.bytes()[1:])
 }
 
 func (pub *PublicKey) Equal(p *PublicKey) bool {
@@ -38,16 +38,19 @@ func (pub *PublicKey) Equal(p *PublicKey) bool {
 }
 
 func (pub *PublicKey) Address() Address {
-	h1 := sha3.NewKeccak512()
-	h1.Write(intToBytes(pub.x))
-	h1.Write(intToBytes(pub.y))
-	result := h1.Sum(nil)
 
-	h2 := sha3.NewKeccak256()
-	h2.Write(result)
-	result = h2.Sum(nil)
+	// address := last 24 bytes of SHAKE512(SHAKE512(x||y))
+	buf := make([]byte, 64)
+	h := sha3.NewShake256()
+	h.Write(intToBytes(pub.x))
+	h.Write(intToBytes(pub.y))
+	h.Read(buf)
 
-	return newAddress(result[32-AddressLength:])
+	h = sha3.NewShake256()
+	h.Write(buf)
+	h.Read(buf)
+
+	return newAddress(buf[64-AddressLength:])
 }
 
 func (pub *PublicKey) ID() uint64 {
