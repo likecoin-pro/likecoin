@@ -45,6 +45,14 @@ func TestPublicKey_String(t *testing.T) {
 	assert.Equal(t, "rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR", str)
 }
 
+func TestPublicKey_Hex(t *testing.T) {
+	pub := NewPrivateKeyBySecret("abc").PublicKey
+
+	hex := pub.Hex()
+
+	assert.Equal(t, "0x022f86f8c408c20e8bdcef6471676a2157624915355fe662b568ac5e2a2a76fed5d34d4a184176a3e4a28bac7203a860510e363601f7c8f8657067173ed83f6e", hex)
+}
+
 func TestPublicKey_MarshalJSON(t *testing.T) {
 	pub := MustParsePublicKey("rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR")
 
@@ -90,4 +98,31 @@ func TestPublicKey_Empty(t *testing.T) {
 	assert.True(t, pub1.Empty())
 	assert.True(t, pub2.Empty())
 	assert.True(t, !pub3.Empty())
+}
+
+func TestRecoverPublicKey(t *testing.T) {
+	prv := NewPrivateKey()
+	pub1 := prv.PublicKey
+	hash := HashSum256([]byte("Test text"))
+	sign := prv.Sign(hash)
+
+	pub2, err := RecoverPublicKey(hash, sign)
+	verify := pub2.Verify(hash, sign)
+
+	assert.NoError(t, err)
+	assert.True(t, pub1.Equal(pub2))
+	assert.True(t, verify)
+}
+
+func TestRecoverPublicKey_fail(t *testing.T) {
+	prv := NewPrivateKey()
+	pub1 := prv.PublicKey
+	hash := HashSum256([]byte("Test text"))
+	sign := prv.Sign(hash)
+
+	sign[13]++ // corrupt signature
+
+	pub2, err := RecoverPublicKey(hash, sign)
+
+	assert.True(t, err != nil || !pub1.Equal(pub2))
 }
