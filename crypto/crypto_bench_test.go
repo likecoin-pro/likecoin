@@ -16,7 +16,7 @@ func BenchmarkGenerateKey(b *testing.B) {
 
 func BenchmarkSign(b *testing.B) {
 	prv := NewPrivateKey()
-	data := hash256([]byte("Abc Ёпрст"))
+	data := HashSum256([]byte("Abc Ёпрст"))
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -27,7 +27,7 @@ func BenchmarkSign(b *testing.B) {
 func BenchmarkVerify(b *testing.B) {
 	prv := NewPrivateKey()
 	pub := prv.PublicKey
-	data := hash256([]byte("Abc Ёпрст"))
+	data := HashSum256([]byte("Abc Ёпрст"))
 	sign := prv.Sign(data)
 	b.ResetTimer()
 
