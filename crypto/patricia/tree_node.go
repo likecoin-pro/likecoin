@@ -1,15 +1,19 @@
 package patricia
 
-import "github.com/likecoin-pro/likecoin/crypto/merkle"
+import (
+	"github.com/denisskin/bin"
+	"github.com/likecoin-pro/likecoin/crypto/merkle"
+)
 
 type node struct {
-	val    []byte
+	key    []byte
+	value  []byte
 	hashes [16][]byte
 }
 
 func (nd *node) hash() []byte {
-	if nd.val != nil {
-		return nd.val
+	if nd.key != nil || nd.value != nil {
+		return merkle.Root(nd.key, nd.value)
 	}
 	var hh [][]byte // no empty hashes
 	for _, b := range nd.hashes {
@@ -36,45 +40,38 @@ func (nd *node) proof(iHash int) []byte {
 }
 
 func (nd *node) encode() (data []byte) {
-	data = make([]byte, 2)
-	var ff uint32
+	w := bin.NewBuffer(nil)
+	w.WriteBytes(nd.key)
+	w.WriteBytes(nd.value)
+
+	var ff uint16
 	for i, b := range nd.hashes {
 		if len(b) != 0 {
-			ff |= 1 << uint32(i)
-			data = append(data, b...)
+			ff |= 1 << uint16(i)
 		}
 	}
-	if ff == 0 {
-		data = append(data, nd.val...)
-	} else {
-		data[0] = uint8(ff >> 8)
-		data[1] = uint8(ff)
+	w.WriteUint16(ff)
+	for _, b := range nd.hashes {
+		if len(b) != 0 {
+			w.Write(b)
+		}
 	}
-	return
+	return w.Bytes()
 }
 
-func (nd *node) decode(data []byte) (n int, err error) {
-	if len(data) < 2 {
-		err = errInvalidNodeData
-		return
-	}
-	ff, data := (uint32(data[0])<<8)|uint32(data[1]), data[2:] // flags
-	n += 2
-	if ff == 0 {
-		nd.val = data
-		n += len(data)
-		return
-	}
-	nd.val = nil
+func (nd *node) decode(data []byte) error {
+	r := bin.NewBuffer(data)
+	nd.key, _ = r.ReadBytes()
+	nd.value, _ = r.ReadBytes()
+	ff, _ := r.ReadUint16()
 	for i := range nd.hashes {
-		if ff&(1<<uint32(i)) != 0 {
-			if len(data) < merkle.HashSize {
-				err = errInvalidNodeData
-				return
-			}
-			nd.hashes[i], data = data[:merkle.HashSize], data[merkle.HashSize:]
-			n += merkle.HashSize
+		if ff&(1<<uint16(i)) != 0 {
+			nd.hashes[i] = make([]byte, merkle.HashSize)
+			r.Read(nd.hashes[i])
 		}
 	}
-	return
+	if r.Error() != nil {
+		return errInvalidNodeData
+	}
+	return nil
 }

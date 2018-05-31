@@ -3,6 +3,8 @@ package patricia
 import (
 	"bytes"
 	"errors"
+
+	"github.com/denisskin/bin"
 )
 
 type Storage interface {
@@ -20,7 +22,6 @@ type Tree struct {
 
 var (
 	errKeyNotFound     = errors.New("patricia: key not found tree-node data")
-	errKeyHasExists    = errors.New("patricia: key has exists")
 	errInvalidNodeData = errors.New("patricia: invalid tree-node data")
 )
 
@@ -43,19 +44,45 @@ func (t *Tree) Root() (root []byte, err error) {
 	return t.root, nil
 }
 
-func (t *Tree) Put(key []byte) (err error) {
+func (t *Tree) PutVar(key, value interface{}) (err error) {
+	return t.Put(encode(key), encode(value))
+}
+
+func decode(data []byte, v interface{}) error {
+	switch v := v.(type) {
+	case *[]byte:
+		*v = data
+	case *string:
+		*v = string(data)
+	}
+	return bin.Decode(data, v)
+}
+
+func encode(v interface{}) []byte {
+	switch v := v.(type) {
+	case []byte:
+		return v
+	case string:
+		return []byte(v)
+	}
+	return bin.Encode(v)
+}
+
+func (t *Tree) Put(key, value []byte) (err error) {
 	t.puts = map[string]*node{}
 	defer func() {
 		t.puts = nil
 	}()
 
-	root, err := t.put(make([]byte, 0, 10), key)
+	root, err := t.put(make([]byte, 0, 10), key, value)
 	if err != nil {
 		return
 	}
 
+	//fmt.Printf("PUT %x -> %x\n", key, value)
 	// save to db
 	for path, nd := range t.puts {
+		//fmt.Printf("-- put %x -> %x\n", path, nd.encode())
 		err = t.db.Put(t.dbKey([]byte(path)), nd.encode())
 		if err != nil {
 			return
@@ -67,25 +94,38 @@ func (t *Tree) Put(key []byte) (err error) {
 	return
 }
 
-func (t *Tree) GetProof(key []byte) (proof, root []byte, err error) {
-	if proof, err = t.proof(make([]byte, 0, 10), key); err != nil {
+func (t *Tree) Get(key []byte) (value []byte, err error) {
+	value, _, err = t.proof(make([]byte, 0, 10), key)
+	return
+}
+
+func (t *Tree) GetVar(key, v interface{}) (err error) {
+	data, err := t.Get(encode(key))
+	if err == nil {
+		err = decode(data, v)
+	}
+	return
+}
+
+func (t *Tree) GetProof(key []byte) (value, proof, root []byte, err error) {
+	if value, proof, err = t.proof(make([]byte, 0, 10), key); err != nil {
 		return
 	}
 	root, err = t.Root()
 	return
 }
 
-func (t *Tree) AppendingProof(newKey []byte) (proof, root []byte, err error) {
+func (t *Tree) AppendingProof(newKey, value []byte) (proof, root []byte, err error) {
 	t.puts = map[string]*node{}
 	defer func() {
 		t.puts = nil
 	}()
 	buf := make([]byte, 0, 10)
-	root, err = t.put(buf, newKey)
+	root, err = t.put(buf, newKey, value)
 	if err != nil {
 		return
 	}
-	proof, err = t.proof(buf, newKey)
+	_, proof, err = t.proof(buf, newKey)
 	if err != nil {
 		return
 	}
@@ -107,7 +147,7 @@ func (t *Tree) getNode(key []byte) (nd *node, err error) {
 		return nil, nil
 	}
 	nd = new(node)
-	_, err = nd.decode(data)
+	err = nd.decode(data)
 	return
 }
 
@@ -126,28 +166,30 @@ func (t *Tree) dbKey(key []byte) []byte {
 	return append(t.keyPfx, key...)
 }
 
-func (t *Tree) put(path, key []byte) (newHash []byte, err error) {
+func (t *Tree) put(path, key, value []byte) (newHash []byte, err error) {
 	nd, err := t.getNode(path)
 	if err != nil {
 		return
-	} else if nd == nil {
-		nd = &node{val: key}
+	}
+	if nd == nil {
+		nd = &node{key: key, value: value}
+
+	} else if bytes.Equal(nd.key, key) {
+		nd.value = value
+
 	} else {
 		lv := len(path)
-		if nd.val != nil {
-			val := nd.val
-			if bytes.Equal(val, key) {
-				return nil, errKeyHasExists
-			}
-			i := idx(val, lv)
-			nd.val = nil
-			nd.hashes[i], err = t.put(append(path, i), val)
+		if nd.key != nil {
+			k, v := nd.key, nd.value
+			i := idx(k, lv)
+			nd.key, nd.value = nil, nil
+			nd.hashes[i], err = t.put(append(path, i), k, v)
 			if err != nil {
 				return
 			}
 		}
 		i := idx(key, lv)
-		nd.hashes[i], err = t.put(append(path, i), key)
+		nd.hashes[i], err = t.put(append(path, i), key, value)
 		if err != nil {
 			return
 		}
@@ -156,23 +198,23 @@ func (t *Tree) put(path, key []byte) (newHash []byte, err error) {
 	return nd.hash(), err
 }
 
-func (t *Tree) proof(path, key []byte) (proof []byte, err error) {
+func (t *Tree) proof(path, key []byte) (value, proof []byte, err error) {
 	nd, err := t.getNode(path)
 	if err != nil {
 		return
 	}
 	if nd == nil { // null leaf
-		return nil, errKeyNotFound
+		return nil, nil, errKeyNotFound
 	}
-	if nd.val != nil { // leaf
-		if !bytes.Equal(nd.val, key) {
+	if nd.key != nil { // leaf
+		if !bytes.Equal(nd.key, key) {
 			// todo: return proof of empty
-			return nil, errKeyNotFound
+			return nil, nil, errKeyNotFound
 		}
-		return nil, nil
+		return nd.value, nil, nil
 	}
 	i := idx(key, len(path))
-	proof, err = t.proof(append(path, i), key)
+	value, proof, err = t.proof(append(path, i), key)
 	proof = append(proof, nd.proof(int(i))...)
 	return
 }
