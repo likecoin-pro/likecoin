@@ -2,34 +2,51 @@ package patricia
 
 import (
 	"encoding/hex"
-	"math/rand"
 	"testing"
 
+	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/crypto/merkle"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTree_Root(t *testing.T) {
 	tree := NewTree(nil, nil)
-	for _, v := range randSlice(10000) {
-		tree.Put(v)
+	for k, v := range testValues(5000) {
+		tree.PutVar(k, v)
 	}
 
-	aRoot, _ := tree.Root()
+	root, _ := tree.Root()
 
-	assert.Equal(t, "ee50ff497016e338ad8b41f320245cd6bc9d7efcccdc32143d49f47cd7408114", hex.EncodeToString(aRoot))
+	assert.Equal(t, "8d3846d06998ea8ba2cb81e79bebd05b98d2e04067671b0e69a0eee8c79567ba", hex.EncodeToString(root))
+}
+
+func TestTree_Root_empty(t *testing.T) {
+	tree := NewTree(nil, nil)
+
+	root0, _ := tree.Root()
+
+	assert.Equal(t, "", hex.EncodeToString(root0))
+}
+
+func TestTree_Root_one(t *testing.T) {
+	tree := NewTree(nil, nil)
+	tree.PutVar("123", "abc")
+
+	root, _ := tree.Root()
+
+	assert.Equal(t, merkle.Root([]byte("123"), []byte("abc")), root)
 }
 
 func TestTree_Put(t *testing.T) {
 	a := NewTree(nil, nil)
 	b := NewTree(nil, nil)
 
-	for _, v := range randSlice(10000) {
-		a.Put(v)
+	for k, v := range testValues(5000) {
+		a.PutVar(k, v)
 	}
-	for _, v := range randSlice(10000) {
-		a.Put(v)
-		b.Put(v)
+	for k, v := range testValues(5000) {
+		a.PutVar(k, v)
+		b.PutVar(k, v)
 	}
 
 	aRoot, _ := a.Root()
@@ -38,53 +55,112 @@ func TestTree_Put(t *testing.T) {
 	assert.Equal(t, aRoot, bRoot)
 }
 
+func TestTree_Get(t *testing.T) {
+	a := NewTree(nil, nil)
+	for k, v := range testValues(5000) {
+		a.Put(encode(k), v)
+	}
+
+	for k, v := range testValues(5000) {
+		val, err := a.Get(encode(k))
+
+		assert.NoError(t, err)
+		assert.Equal(t, v, val)
+	}
+}
+
 func TestTree_GetProof(t *testing.T) {
 	a := NewTree(nil, nil)
-	keys := randSlice(5000)
+	keys := testValues(5000)
 
-	for _, key := range keys {
-		err := a.Put(key)
+	for k, v := range keys {
+		key := encode(k)
+		err := a.Put(key, v)
 		assert.NoError(t, err)
 
-		proof, root, err := a.GetProof(key)
+		val, proof, root, err := a.GetProof(key)
 		assert.NoError(t, err)
+		assert.Equal(t, v, val)
 
-		ok := merkle.Verify(key, proof, root)
+		ok := merkle.Verify(merkle.Root(key, val), proof, root)
 		assert.True(t, ok)
 	}
 
-	for _, key := range keys {
-		err := a.Put(key)
-		assert.Error(t, err)
-		assert.Equal(t, errKeyHasExists, err)
+	for k, v := range keys {
+		key := encode(k)
 
-		proof, root, err := a.GetProof(key)
+		err := a.Put(key, v)
 		assert.NoError(t, err)
 
-		ok := merkle.Verify(key, proof, root)
+		val, proof, root, err := a.GetProof(key)
+		assert.NoError(t, err)
+		assert.Equal(t, v, val)
+
+		ok := merkle.Verify(merkle.Root(key, val), proof, root)
 		assert.True(t, ok)
 	}
 }
 
+func TestTree_GetProof_len(t *testing.T) {
+	tree := NewTree(nil, nil)
+
+	key := []byte("001")
+	tree.Put(key, []byte("val"))
+	val, proof, root, err := tree.GetProof(key)
+	verify := merkle.Verify(merkle.Root(key, val), proof, root)
+	assert.NoError(t, err)
+	assert.True(t, verify)
+	assert.Equal(t, 0, len(proof))
+
+	key = []byte("002")
+	tree.Put(key, []byte("val"))
+	val, proof, root, err = tree.GetProof(key)
+	verify = merkle.Verify(merkle.Root(key, val), proof, root)
+	assert.NoError(t, err)
+	assert.True(t, verify)
+	assert.Equal(t, 33, len(proof))
+
+	key = []byte("003")
+	tree.Put(key, []byte("val"))
+	val, proof, root, err = tree.GetProof(key)
+	verify = merkle.Verify(merkle.Root(key, val), proof, root)
+	assert.NoError(t, err)
+	assert.True(t, verify)
+	assert.Equal(t, 33, len(proof))
+
+	key = []byte("004")
+	tree.Put(key, []byte("val"))
+	val, proof, root, err = tree.GetProof(key)
+	verify = merkle.Verify(merkle.Root(key, val), proof, root)
+	assert.NoError(t, err)
+	assert.True(t, verify)
+	assert.Equal(t, 66, len(proof))
+
+	key = []byte("010")
+	tree.Put(key, []byte("val"))
+	val, proof, root, err = tree.GetProof(key)
+	verify = merkle.Verify(merkle.Root(key, val), proof, root)
+	assert.NoError(t, err)
+	assert.True(t, verify)
+	assert.Equal(t, 33, len(proof))
+}
+
 func TestTree_AppendingProof(t *testing.T) {
 	a := NewTree(nil, nil)
-	keys := randSlice(5000)
 
-	for i, key := range keys {
+	for k, val := range testValues(5000) {
+		key := encode(k)
 
 		root1, err := a.Root()
 		assert.NoError(t, err)
 
 		// get appending key proof and new root
-		proof2A, root2A, err := a.AppendingProof(key)
+		proof2A, root2A, err := a.AppendingProof(key, val)
 		assert.NoError(t, err)
 		assert.NotEqual(t, root1, root2A) // new root
-		if i > 0 {
-			assert.True(t, len(proof2A) > 0)
-		}
 
 		// verify proof
-		ok := merkle.Verify(key, proof2A, root2A)
+		ok := merkle.Verify(merkle.Root(key, val), proof2A, root2A)
 		assert.True(t, ok)
 
 		// check root; root is not changed
@@ -93,7 +169,7 @@ func TestTree_AppendingProof(t *testing.T) {
 		assert.Equal(t, root1, root1A)
 
 		// insert new key
-		err = a.Put(key)
+		err = a.Put(key, val)
 		assert.NoError(t, err)
 
 		// get new root
@@ -102,23 +178,19 @@ func TestTree_AppendingProof(t *testing.T) {
 		assert.Equal(t, root2A, root2)
 
 		// get new proof
-		proof2B, root2B, err := a.GetProof(key)
+		val2B, proof2B, root2B, err := a.GetProof(key)
 		assert.NoError(t, err)
+		assert.Equal(t, val, val2B)
 		assert.Equal(t, proof2A, proof2B)
 		assert.Equal(t, root2A, root2B)
 		assert.Equal(t, root2, root2B)
 	}
 }
 
-func randSlice(n int) [][]byte {
-	r := rand.New(rand.NewSource(0))
-	a := make([][]byte, n)
-	for i := range a {
-		a[i] = make([]byte, merkle.HashSize)
-		r.Read(a[i])
+func testValues(n int) map[int][]byte {
+	v := make(map[int][]byte, n)
+	for i := 0; i < n; i++ {
+		v[i] = bin.Hash128(i)
 	}
-	rand.Shuffle(len(a), func(i, j int) {
-		a[i], a[j] = a[j], a[i]
-	})
-	return a
+	return v
 }
