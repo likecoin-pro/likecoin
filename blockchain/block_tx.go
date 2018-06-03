@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"encoding/json"
 
 	"github.com/denisskin/bin"
@@ -23,7 +24,6 @@ type BlockTx struct {
 }
 
 func NewBlockTx(sender *crypto.PrivateKey, obj TxObject) *BlockTx {
-	// new user tx
 	tx := &Transaction{
 		Type:    typeByObject(obj),   //
 		Version: 0,                   //
@@ -56,7 +56,7 @@ func (btx *BlockTx) TxObject() TxObject {
 	return obj
 }
 
-func (btx *BlockTx) TxType() Type {
+func (btx *BlockTx) TxType() TxType {
 	return btx.Tx.Type
 }
 
@@ -66,6 +66,10 @@ func (btx *BlockTx) TxAddress() crypto.Address {
 
 func (btx *BlockTx) TxHash() []byte {
 	return btx.Tx.Hash()
+}
+
+func (btx *BlockTx) Equal(btx1 *BlockTx) bool {
+	return bytes.Equal(btx.Encode(), btx1.Encode())
 }
 
 func (btx *BlockTx) Encode() []byte {
