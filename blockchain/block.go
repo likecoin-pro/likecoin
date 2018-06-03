@@ -53,13 +53,13 @@ func NewBlock(
 		ChainID:   pre.ChainID,
 		Num:       pre.Num + 1,
 		PrevHash:  pre.Hash(),
-		TxRoot:    pre.txRoot(txs),
+		TxRoot:    txRoot(txs),
 		Timestamp: timestamp(),
 		Nonce:     0,
 		Miner:     prv.PublicKey,
 	}
 
-	err = chainTree.Put(block.Hash())
+	err = chainTree.PutVar(block.Num, block.Hash())
 	if err != nil {
 		return nil, err
 	}
@@ -173,14 +173,21 @@ func (b *Block) VerifyTxs(txs []*BlockTx) error {
 		return ErrEmptyBlock
 	}
 
-	if txRoot := b.txRoot(txs); !bytes.Equal(b.TxRoot, txRoot) {
+	for _, tx := range txs {
+		// check tx-chain info
+		if tx.Tx.ChainID != b.ChainID {
+			return ErrInvalidChainID
+		}
+	}
+
+	if txRoot := txRoot(txs); !bytes.Equal(b.TxRoot, txRoot) {
 		return ErrInvalidMerkleRoot
 	}
 
 	return nil
 }
 
-func (b *Block) txRoot(txs []*BlockTx) []byte {
+func txRoot(txs []*BlockTx) []byte {
 	var hh [][]byte
 	for _, it := range txs {
 		hh = append(hh, it.Hash())
