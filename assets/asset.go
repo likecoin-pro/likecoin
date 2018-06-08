@@ -32,36 +32,12 @@ func (a Asset) IsName() bool {
 	return a.Type() == NameType
 }
 
-func (a Asset) Label() string {
-	if inf := coinsCFG[a[1]]; inf != nil {
-		return inf.Label
-	}
-	return a.String()
-}
-
-func (a Asset) Counter(counterID string) Asset {
-	return NewCounter(a[1], counterID)
-}
-
-func (a Asset) CounterID() string {
-	// if !a.IsCounter() || len(a) < 2 panic()
-	return string(a[2:])
-}
-
-func (a Asset) CoinConfig() *coinConfig {
-	return coinsCFG[a[1]]
-}
-
-func (a Asset) CounterSrcURL() string {
-	// if !a.IsCounter() || len(a) < 2 panic()
-	coinID, counterID := a[1], string(a[2:])
-	inf := coinsCFG[coinID]
-	return strings.Replace(inf.SrcURL, "{ID}", counterID, 1)
-}
-
-func (a Asset) CounterType() uint8 {
-	// if !a.IsCounter() || len(a) < 2 panic()
+func (a Asset) ID() uint8 {
 	return a[1]
+}
+
+func (a Asset) SourceCounter(counterID string) Asset {
+	return NewCounter(a[1], counterID)
 }
 
 func (a Asset) Equal(b Asset) bool {
