@@ -27,6 +27,13 @@ func (v *Value) Equal(b *Value) bool {
 		v.Tag == b.Tag
 }
 
+func (v *Value) StateKey() []byte {
+	b := make([]byte, 0, 26)
+	b = append(b, v.Address[:]...)
+	b = append(b, v.Asset...)
+	return b
+}
+
 func (v *Value) Hash() []byte {
 	return crypto.Hash256(
 		v.ChainID,
