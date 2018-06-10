@@ -16,7 +16,7 @@ func Int(v int64) Number {
 
 func StrAmount(amount interface{}, a assets.Asset) string {
 	if len(a) == 0 {
-		a = assets.LikeCoin
+		a = assets.Default
 	}
 	s := fmt.Sprint(amount)
 	if a.IsCoin() {
