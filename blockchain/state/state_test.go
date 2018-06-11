@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	coin = assets.LikeCoin
+	coin = assets.Likecoin
 
 	addr0 = crypto.MustParseAddress("Like5QU4UiVeh7459hiRPJZfh9AhoFN29Pn9bwwSGvJ")
 	addrA = crypto.MustParseAddress("Like46j9pghNTUaxd2zRbJfruQt8U9AWMd3Rb5bJxLj")
