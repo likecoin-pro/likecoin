@@ -14,10 +14,11 @@ type Storage interface {
 }
 
 type Tree struct {
-	db     Storage
-	keyPfx []byte
-	root   []byte
-	puts   map[string]*node
+	db       Storage
+	keyPfx   []byte
+	root     []byte
+	puts     map[string]*node
+	readOnly bool
 }
 
 var (
@@ -25,11 +26,15 @@ var (
 	errInvalidNodeData = errors.New("patricia: invalid tree-node data")
 )
 
-func NewTree(db Storage, keyPfx []byte) *Tree {
+func NewTree(db Storage, keyPfx []byte, readOnly bool) *Tree {
 	if db == nil {
 		db = MemoryStorage{}
 	}
-	return &Tree{db: db, keyPfx: keyPfx}
+	return &Tree{
+		db:       db,
+		keyPfx:   keyPfx,
+		readOnly: readOnly,
+	}
 }
 
 func (t *Tree) Root() (root []byte, err error) {
@@ -79,13 +84,13 @@ func (t *Tree) Put(key, value []byte) (err error) {
 		return
 	}
 
-	//fmt.Printf("PUT %x -> %x\n", key, value)
 	// save to db
-	for path, nd := range t.puts {
-		//fmt.Printf("-- put %x -> %x\n", path, nd.encode())
-		err = t.db.Put(t.dbKey([]byte(path)), nd.encode())
-		if err != nil {
-			return
+	if !t.readOnly {
+		for path, nd := range t.puts {
+			err = t.db.Put(t.dbKey([]byte(path)), nd.encode())
+			if err != nil {
+				return
+			}
 		}
 	}
 
