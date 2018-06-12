@@ -54,6 +54,10 @@ func Panic(v ...interface{}) {
 	Fatal.Panic(v...)
 }
 
+func Panicf(format string, v ...interface{}) {
+	Fatal.Panicf(format, v...)
+}
+
 func Print(v ...interface{}) {
 	Info.Print(v...)
 }
