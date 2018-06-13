@@ -32,21 +32,21 @@ type Block struct {
 	Reserved3 []byte `json:"-"`
 }
 
+type BCContext interface {
+	State() *state.State
+	StateTree() *patricia.Tree
+	ChainTree() *patricia.Tree
+}
+
+// todo: StateTree() move to *State
+// todo: tx.Execute() -> stateUpdates, stateRoot, err
+
 func NewBlock(
 	pre *Block,
 	txs []*BlockTx,
 	prv *crypto.PrivateKey,
-	state *state.State,
-	chainTree *patricia.Tree,
+	bc BCContext,
 ) (block *Block, err error) {
-
-	for _, bTx := range txs {
-		bTx.StateUpdates, err = bTx.Tx.Execute(state)
-		if err != nil {
-			return
-		}
-		state.Apply(bTx.StateUpdates)
-	}
 
 	block = &Block{
 		Version:   0,
@@ -59,6 +59,26 @@ func NewBlock(
 		Miner:     prv.PublicKey,
 	}
 
+	st := bc.State()
+	stTree := bc.StateTree()
+	for _, bTx := range txs {
+		bTx.StateUpdates, err = bTx.Tx.Execute(st)
+		if err != nil {
+			return
+		}
+		st.Apply(bTx.StateUpdates)
+		for _, v := range bTx.StateUpdates {
+			if v.ChainID == block.ChainID {
+				stTree.Put(v.StateKey(), v.Balance.Bytes())
+			}
+		}
+	}
+	block.StateRoot, err = stTree.Root()
+	if err != nil {
+		return nil, err
+	}
+
+	chainTree := bc.ChainTree()
 	err = chainTree.PutVar(block.Num, block.Hash())
 	if err != nil {
 		return nil, err

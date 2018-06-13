@@ -32,8 +32,7 @@ const (
 	dbTabBlock     = 0x01 // (blockNum) => Block
 	dbTabTxs       = 0x02 // (blockNum, txIdx) => BlockTx
 	dbTabChainTree = 0x03 //
-	//dbTabAccounts  = 0x05 // (addr) => Account
-	//dbTabStateTree = 0x06 // (asset, addr) => sateValue
+	dbTabStateTree = 0x04 // (asset, addr) => sateValue
 
 	// indexes
 	dbIdxTxID         = 0x10 // (txID)                        => txNum
@@ -83,11 +82,16 @@ func (s *BlockchainStorage) Drop() (err error) {
 }
 
 func newPatriciaTree(db patricia.Storage, tab goldb.Entity) *patricia.Tree {
-	return patricia.NewTree(db, goldb.Key(tab))
+	_, isTx := db.(*goldb.Transaction)
+	return patricia.NewTree(db, goldb.Key(tab), !isTx)
 }
 
 func (s *BlockchainStorage) ChainTree() *patricia.Tree {
 	return newPatriciaTree(s.db, dbTabChainTree)
+}
+
+func (s *BlockchainStorage) StateTree() *patricia.Tree {
+	return newPatriciaTree(s.db, dbTabStateTree)
 }
 
 // State returns state struct from db
@@ -119,7 +123,7 @@ func (s *BlockchainStorage) PutBlock(
 			tr.Fail(err)
 		}
 
-		//stateTree := newPatriciaTree(tr, dbTabStateTree)
+		stateTree := newPatriciaTree(tr, dbTabStateTree)
 
 		// add index on transactions
 		for txIdx, bTx := range txs {
@@ -179,10 +183,9 @@ func (s *BlockchainStorage) PutBlock(
 
 			// save state to db-storage
 			for stIdx, v := range bTx.StateUpdates {
-
-				//stateTree.Put(v.Hash())
-
 				if v.ChainID == s.chainID {
+					stateTree.Put(v.StateKey(), v.Balance.Bytes())
+
 					tr.PutVar(goldb.Key(dbIdxAsset, v.Asset, txUID, stIdx, v.Address), v.Balance)
 
 					tr.PutVar(goldb.Key(dbIdxAssetAddr, v.Asset, v.Address, txUID, stIdx), v.Balance)
@@ -195,9 +198,9 @@ func (s *BlockchainStorage) PutBlock(
 		}
 
 		// verify state root
-		//if stateRoot, _ := stateTree.Root(); !bytes.Equal(block.StateRoot, stateRoot) {
-		//	tr.Fail(errIncorrectStateRoot)
-		//}
+		if stateRoot, _ := stateTree.Root(); !bytes.Equal(block.StateRoot, stateRoot) {
+			tr.Fail(errIncorrectStateRoot)
+		}
 
 		// verify chain root
 		chainTree := newPatriciaTree(tr, dbTabChainTree)
