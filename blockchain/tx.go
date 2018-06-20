@@ -1,54 +1,66 @@
 package blockchain
 
 import (
-	"encoding/json"
-	"errors"
-	"regexp"
-	"strconv"
-	"time"
-
 	"bytes"
+	"errors"
+	"time"
 
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
 	"github.com/likecoin-pro/likecoin/commons/enc"
 	"github.com/likecoin-pro/likecoin/commons/hex"
+	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/crypto"
+	"github.com/likecoin-pro/likecoin/crypto/merkle"
 )
 
 type TxType = uint8
 
 type Transaction struct {
-	Type    TxType            // tx type
-	Version int               // tx version
-	Network int               //
-	ChainID uint64            //
-	Nonce   uint64            // sender nonce
-	Sender  *crypto.PublicKey // tx sender
-	Data    []byte            // encoded tx-object
+
+	// Tx data
+	Type      TxType            // tx-type
+	Version   int               // tx version
+	Network   int               // networkID
+	ChainID   uint64            //
+	Nonce     uint64            // sender nonce (by default: Unix-time in µsec)
+	Data      []byte            // encoded tx-object
+	Reserved1 []byte            //
+	Reserved2 []byte            //
+	Sender    *crypto.PublicKey // tx-sender
+	Sig       []byte            // tx-sender signature
+
+	// Chain data
+	StateUpdates state.Values // state changes (is not filled by sender)
 
 	// not imported fields
-	_obj TxObject //
+	blockNum uint64   //
+	blockIdx int      //
+	blockTs  int64    //
+	_obj     TxObject //
 }
 
-type transactionJSON struct {
-	Type    TxType            `json:"type"`    // tx type
-	Version int               `json:"version"` // tx version
-	Network int               `json:"network"` //
-	ChainID uint64            `json:"chain"`   //
-	Nonce   uint64            `json:"nonce"`   //
-	Sender  *crypto.PublicKey `json:"sender"`  // tx sender
-	ObjRaw  hex.Bytes         `json:"data"`    // encoded tx-data
-	Obj     TxObject          `json:"obj"`     // unserialized data
+func NewTx(sender *crypto.PrivateKey, obj TxObject) *Transaction {
+	tx := &Transaction{
+		Type:    typeByObject(obj),   //
+		Version: 0,                   //
+		Network: config.NetworkID,    //
+		ChainID: config.ChainID,      //
+		Sender:  sender.PublicKey,    //
+		Nonce:   uint64(timestamp()), //
+		Data:    obj.Encode(),        // encoded tx-object
+	}
+	tx.Sig = sender.Sign(tx.Hash())
+	return tx
 }
 
 var (
-	ErrInvalidTxData     = errors.New("invalid tx data")
-	errUnknownTxIDFormat = errors.New("unknown txID format")
-	errEmptyTxSender     = errors.New("tx-error: empty tx-sender")
-	errEmptyTxData       = errors.New("tx-error: empty tx-data")
-
-	reTxID = regexp.MustCompile(`^(?:0x)?([0-9a-f]{16})(?:[0-9a-f]{48})?$`)
+	ErrTxEmptySender      = errors.New("tx-verify-error: empty tx-sender")
+	ErrTxEmptyData        = errors.New("tx-verify-error: empty tx-data")
+	ErrTxInvalidData      = errors.New("tx-verify-error: invalid tx-data")
+	ErrTxInvalidChainID   = errors.New("tx-verify-error: invalid chain-id")
+	ErrTxInvalidNetworkID = errors.New("tx-verify-error: invalid network-id")
+	ErrTxIsTooLong        = errors.New("tx-verify-error: tx is too long")
 )
 
 func (tx *Transaction) String() string {
@@ -66,10 +78,11 @@ func (tx *Transaction) StrID() string {
 	return hex.EncodeUint(tx.ID())
 }
 
-func (tx *Transaction) Address() crypto.Address {
+func (tx *Transaction) SenderAddress() crypto.Address {
 	return tx.Sender.Address()
 }
 
+// Hash returns hash of senders data
 func (tx *Transaction) Hash() []byte {
 	return crypto.Hash256(
 		tx.Type,
@@ -77,9 +90,15 @@ func (tx *Transaction) Hash() []byte {
 		tx.Network,
 		tx.ChainID,
 		tx.Nonce,
-		tx.Sender,
 		tx.Data,
+		tx.Reserved1,
+		tx.Reserved2,
+		tx.Sender,
 	)
+}
+
+func (tx *Transaction) TxStHash() []byte {
+	return merkle.Root(tx.Hash(), tx.StateUpdates.Hash())
 }
 
 func (tx *Transaction) Size() int {
@@ -94,9 +113,34 @@ func (tx *Transaction) Equal(tx1 *Transaction) bool {
 	return bytes.Equal(tx.Encode(), tx1.Encode())
 }
 
+func (tx *Transaction) TxObject() TxObject {
+	obj, _ := tx.Object()
+	return obj
+}
+
+func (tx *Transaction) SetBlockInfo(blockNum uint64, blockTxIdx int, blockTs int64) {
+	tx.blockNum, tx.blockIdx, tx.blockTs = blockNum, blockTxIdx, blockTs
+}
+
+func (tx *Transaction) BlockNum() uint64 {
+	return tx.blockNum
+}
+
+func (tx *Transaction) BlockIdx() int {
+	return tx.blockIdx
+}
+
+func (tx *Transaction) BlockTs() int64 {
+	return tx.blockTs
+}
+
+func (tx *Transaction) Seq() uint64 {
+	return (tx.blockNum << 32) | uint64(tx.blockIdx)
+}
+
 func (tx *Transaction) Encode() []byte {
 	if len(tx.Data) == 0 {
-		panic(errEmptyTxData)
+		panic(ErrTxEmptyData)
 	}
 	return bin.Encode(
 		tx.Type,
@@ -104,8 +148,12 @@ func (tx *Transaction) Encode() []byte {
 		tx.Network,
 		tx.ChainID,
 		tx.Nonce,
-		tx.Sender,
 		tx.Data,
+		tx.Reserved1,
+		tx.Reserved2,
+		tx.Sender,
+		tx.Sig,
+		tx.StateUpdates,
 	)
 }
 
@@ -116,8 +164,12 @@ func (tx *Transaction) Decode(data []byte) (err error) {
 		&tx.Network,
 		&tx.ChainID,
 		&tx.Nonce,
-		&tx.Sender,
 		&tx.Data,
+		&tx.Reserved1,
+		&tx.Reserved2,
+		&tx.Sender,
+		&tx.Sig,
+		&tx.StateUpdates,
 	)
 }
 
@@ -141,6 +193,39 @@ func (tx *Transaction) Timestamp() time.Time {
 	return time.Unix(0, int64(tx.Nonce)*1e3)
 }
 
+func (tx *Transaction) Verify() error {
+
+	//-- verify transaction data
+	if tx.Network != config.NetworkID {
+		return ErrTxInvalidNetworkID
+	}
+	if tx.ChainID != config.ChainID {
+		return ErrTxInvalidChainID
+	}
+	if len(tx.Data) == 0 {
+		return ErrTxEmptyData
+	}
+	if tx.Sender == nil || tx.Sender.Empty() {
+		return ErrTxEmptySender
+	}
+	if len(tx.Encode()) > config.MaxTransactionSize {
+		return ErrTxIsTooLong
+	}
+	txObj, err := tx.Object()
+	if err != nil {
+		return err
+	}
+	if err := txObj.Verify(tx); err != nil {
+		return err
+	}
+
+	//-- verify sender signature
+	if !tx.Sender.Verify(tx.Hash(), tx.Sig) {
+		return ErrInvalidBlockSig
+	}
+	return nil
+}
+
 // Execute executes tx, changes state, returns state-updates
 func (tx *Transaction) Execute(s *state.State) (updates state.Values, err error) {
 	defer func() {
@@ -161,30 +246,6 @@ func (tx *Transaction) Execute(s *state.State) (updates state.Values, err error)
 	updates = newState.Values()
 
 	return
-}
-
-func (tx *Transaction) MarshalJSON() ([]byte, error) {
-	if tx == nil {
-		return json.Marshal(nil)
-	}
-	obj, _ := tx.Object()
-	return json.Marshal(&transactionJSON{
-		Type:    tx.Type,
-		Version: tx.Version,
-		Network: tx.Network,
-		ChainID: tx.ChainID,
-		Nonce:   tx.Nonce,
-		Sender:  tx.Sender,
-		ObjRaw:  tx.Data,
-		Obj:     obj,
-	})
-}
-
-func ParseTxID(s string) (uint64, error) {
-	if ss := reTxID.FindStringSubmatch(s); len(ss) > 0 {
-		return strconv.ParseUint(ss[1], 16, 64)
-	}
-	return 0, errUnknownTxIDFormat
 }
 
 func TxIDByHash(txHash []byte) uint64 {
