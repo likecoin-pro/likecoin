@@ -7,18 +7,10 @@ import (
 	"github.com/denisskin/bin"
 )
 
-type Storage interface {
-	Get(key []byte) ([]byte, error)
-	Put(key, data []byte) error
-	//Delete(key []byte) error
-}
-
 type Tree struct {
-	db       Storage
-	keyPfx   []byte
-	root     []byte
-	puts     map[string]*node
-	readOnly bool
+	db   Storage
+	root []byte
+	puts map[string]*node
 }
 
 var (
@@ -26,15 +18,15 @@ var (
 	errInvalidNodeData = errors.New("patricia: invalid tree-node data")
 )
 
-func NewTree(db Storage, keyPfx []byte, readOnly bool) *Tree {
+func NewTree(db Storage) *Tree {
 	if db == nil {
-		db = MemoryStorage{}
+		db = NewMemoryStorage(nil)
 	}
-	return &Tree{
-		db:       db,
-		keyPfx:   keyPfx,
-		readOnly: readOnly,
-	}
+	return &Tree{db: db}
+}
+
+func NewSubTree(db Storage, keyPrefix []byte) *Tree {
+	return NewTree(NewSubStorage(db, keyPrefix))
 }
 
 func (t *Tree) Root() (root []byte, err error) {
@@ -85,12 +77,10 @@ func (t *Tree) Put(key, value []byte) (err error) {
 	}
 
 	// save to db
-	if !t.readOnly {
-		for path, nd := range t.puts {
-			err = t.db.Put(t.dbKey([]byte(path)), nd.encode())
-			if err != nil {
-				return
-			}
+	for path, nd := range t.puts {
+		err = t.db.Put([]byte(path), nd.encode())
+		if err != nil {
+			return
 		}
 	}
 
@@ -144,7 +134,7 @@ func (t *Tree) getNode(key []byte) (nd *node, err error) {
 			return nd, nil
 		}
 	}
-	data, err := t.db.Get(t.dbKey(key))
+	data, err := t.db.Get(key)
 	if err != nil {
 		return
 	}
@@ -162,13 +152,6 @@ func idx(key []byte, lv int) uint8 {
 	} else {
 		return key[lv/2] & 0x0f
 	}
-}
-
-func (t *Tree) dbKey(key []byte) []byte {
-	if len(t.keyPfx) == 0 {
-		return key
-	}
-	return append(t.keyPfx, key...)
 }
 
 func (t *Tree) put(path, key, value []byte) (newHash []byte, err error) {
