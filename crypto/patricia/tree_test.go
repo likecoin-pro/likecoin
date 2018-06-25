@@ -10,7 +10,7 @@ import (
 )
 
 func TestTree_Root(t *testing.T) {
-	tree := NewTree(nil, nil)
+	tree := NewTree(nil)
 	for k, v := range testValues(5000) {
 		tree.PutVar(k, v)
 	}
@@ -21,7 +21,7 @@ func TestTree_Root(t *testing.T) {
 }
 
 func TestTree_Root_empty(t *testing.T) {
-	tree := NewTree(nil, nil)
+	tree := NewTree(nil)
 
 	root0, _ := tree.Root()
 
@@ -29,7 +29,7 @@ func TestTree_Root_empty(t *testing.T) {
 }
 
 func TestTree_Root_one(t *testing.T) {
-	tree := NewTree(nil, nil)
+	tree := NewTree(nil)
 	tree.PutVar("123", "abc")
 
 	root, _ := tree.Root()
@@ -38,8 +38,8 @@ func TestTree_Root_one(t *testing.T) {
 }
 
 func TestTree_Put(t *testing.T) {
-	a := NewTree(nil, nil)
-	b := NewTree(nil, nil)
+	a := NewTree(nil)
+	b := NewTree(nil)
 
 	for k, v := range testValues(5000) {
 		a.PutVar(k, v)
@@ -56,7 +56,7 @@ func TestTree_Put(t *testing.T) {
 }
 
 func TestTree_Get(t *testing.T) {
-	a := NewTree(nil, nil)
+	a := NewTree(nil)
 	for k, v := range testValues(5000) {
 		a.Put(encode(k), v)
 	}
@@ -70,7 +70,7 @@ func TestTree_Get(t *testing.T) {
 }
 
 func TestTree_GetProof(t *testing.T) {
-	a := NewTree(nil, nil)
+	a := NewTree(nil)
 	keys := testValues(5000)
 
 	for k, v := range keys {
@@ -102,7 +102,7 @@ func TestTree_GetProof(t *testing.T) {
 }
 
 func TestTree_GetProof_len(t *testing.T) {
-	tree := NewTree(nil, nil)
+	tree := NewTree(nil)
 
 	key := []byte("001")
 	tree.Put(key, []byte("val"))
@@ -146,7 +146,7 @@ func TestTree_GetProof_len(t *testing.T) {
 }
 
 func TestTree_AppendingProof(t *testing.T) {
-	a := NewTree(nil, nil)
+	a := NewTree(nil)
 
 	for k, val := range testValues(5000) {
 		key := encode(k)
