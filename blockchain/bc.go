@@ -8,15 +8,16 @@ import (
 )
 
 var (
-	ErrEmptyBlock          = errors.New("block.Verify-error: Empty block")
-	ErrInvalidGenesisBlock = errors.New("block.Verify-error: Invalid genesis block")
-	ErrEmptyNodeKey        = errors.New("block.Verify-error: Empty node public key")
-	ErrInvalidNodeKey      = errors.New("block.Verify-error: Invalid node public key")
-	ErrInvalidSign         = errors.New("block.Verify-error: Invalid sign")
-	ErrInvalidNum          = errors.New("block.Verify-error: Invalid block num")
-	ErrInvalidChainID      = errors.New("block.Verify-error: Invalid chain ID")
-	ErrInvalidPrevHash     = errors.New("block.Verify-error: Invalid previous hash")
-	ErrInvalidMerkleRoot   = errors.New("block.Verify-error: Invalid Merkle Root")
+	ErrEmptyBlock           = errors.New("block.Verify-error: empty block")
+	ErrInvalidGenesisBlock  = errors.New("block.Verify-error: invalid genesis block")
+	ErrEmptyMinerKey        = errors.New("block.Verify-error: empty miner public key")
+	ErrInvalidMinerKey      = errors.New("block.Verify-error: invalid miner public key")
+	ErrInvalidBlockSig      = errors.New("block.Verify-error: invalid signature")
+	ErrInvalidBlockNum      = errors.New("block.Verify-error: invalid block num")
+	ErrInvalidNetwork       = errors.New("block.Verify-error: invalid network ID")
+	ErrInvalidChainID       = errors.New("block.Verify-error: invalid chain ID")
+	ErrInvalidPrevHash      = errors.New("block.Verify-error: invalid previous block hash")
+	ErrInvalidTxsMerkleRoot = errors.New("block.Verify-error: invalid txs merkle root")
 )
 
 var (
