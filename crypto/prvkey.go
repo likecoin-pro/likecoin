@@ -6,11 +6,15 @@ import (
 
 	"strings"
 
+	"errors"
+
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/likecoin-pro/likecoin/crypto/xhash"
 )
 
 const PrivateKeyVersion = '\x01'
+
+var errPrvUnknownFormat = errors.New("crypto> unknown private key format")
 
 type PrivateKey struct {
 	d *big.Int
@@ -68,7 +72,16 @@ func ParsePrivateKey(hexKey string) (prv *PrivateKey, err error) {
 	if err != nil {
 		return
 	}
-	return newPrvKey(new(big.Int).SetBytes(data[1:])), nil
+	if len(data) == 33 {
+		if data[0] != PrivateKeyVersion {
+			return nil, errPrvUnknownFormat
+		}
+		data = data[1:]
+	}
+	if len(data) != 32 {
+		return nil, errPrvUnknownFormat
+	}
+	return newPrvKey(new(big.Int).SetBytes(data)), nil
 }
 
 func MustParsePrivateKey(hexKey string) *PrivateKey {
