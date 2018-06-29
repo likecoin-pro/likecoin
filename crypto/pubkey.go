@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/likecoin-pro/likecoin/crypto/base58"
+	"github.com/likecoin-pro/likecoin/crypto/merkle"
 )
 
 type PublicKey struct {
@@ -98,8 +99,13 @@ func (pub *PublicKey) UnmarshalJSON(data []byte) error {
 	}
 }
 
-func (pub *PublicKey) Verify(hash []byte, sig []byte) bool {
-	if pub.Empty() || len(sig) != signatureSize || len(hash) != KeySize {
+func (pub *PublicKey) Verify(hash, sig []byte) bool {
+	if pub.Empty() || len(sig) < signatureSize || len(hash) != KeySize {
+		return false
+	}
+	merkleProof, sig := sig[:len(sig)-signatureSize], sig[len(sig)-signatureSize:]
+	hash = merkle.ProofRoot(hash, merkleProof)
+	if len(hash) != KeySize {
 		return false
 	}
 	return secp256k1.VerifySignature(pub.bytes(), hash, sig[:64])
