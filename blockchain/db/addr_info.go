@@ -5,6 +5,7 @@ import (
 	"github.com/likecoin-pro/likecoin/blockchain/state"
 	"github.com/likecoin-pro/likecoin/commons/hex"
 	"github.com/likecoin-pro/likecoin/crypto"
+	"github.com/likecoin-pro/likecoin/object"
 )
 
 type AddressInfo struct {
@@ -15,6 +16,7 @@ type AddressInfo struct {
 	Balance       state.Number `json:"balance"`  // balance on address (not tagged address)
 	Asset         assets.Asset `json:"asset"`    //
 	LastTx        hex.Bytes    `json:"last_tx"`  // last tx of tagged_address
+	User          *object.User `json:"user"`     // user associated with address
 }
 
 func (s *BlockchainStorage) AddressInfo(addr crypto.Address, tag uint64, asset assets.Asset) (inf AddressInfo, err error) {
@@ -34,7 +36,11 @@ func (s *BlockchainStorage) AddressInfo(addr crypto.Address, tag uint64, asset a
 		}
 	}
 	if tx != nil {
-		inf.LastTx = tx.Tx.Hash()
+		inf.LastTx = tx.Hash()
 	}
+	if _, inf.User, err = s.UserByID(addr.ID()); err != nil {
+		return
+	}
+
 	return
 }
