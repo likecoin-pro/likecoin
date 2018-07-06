@@ -1,82 +1,64 @@
 package object
 
 import (
+	"errors"
+
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
+	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
-	"github.com/likecoin-pro/likecoin/blockchain/transaction"
 	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
 type Emission struct {
-	transaction.Header
-	Issuer  *crypto.PublicKey `json:"issuer"`    //
-	Asset   assets.Asset      `json:"asset"`     // coin
-	Comment string            `json:"comment"`   //
-	Outs    []*EmissionOut    `json:"outs"`      //
-	Sign    bin.Bytes         `json:"signature"` // master signature
+	Asset   assets.Asset   `json:"asset"`   // coin
+	Rate    string         `json:"rate"`    // new like-rate
+	Comment string         `json:"comment"` //
+	Outs    []*EmissionOut `json:"outs"`    //
 }
 
 type EmissionOut struct {
-	Address    crypto.Address `json:"address"`   //
-	Amount     int64          `json:"amount"`    // todo: ?? func(preMediaValue(MediaAddr), MediaValue)
-	MediaAddr  string         `json:"media_uid"` // unique media ID
-	MediaValue int64          `json:"media_val"` // current count likes on media
+	Address     crypto.Address `json:"address"` // address linked with media-source
+	Amount      state.Number   `json:"amount"`  // emission amount (in coin)
+	SourceID    string         `json:"srcID"`   // unique media-source ID
+	SourceValue int64          `json:"srcVal"`  // current count likes for media-source
 }
 
-var _ = transaction.Register(TxTypeEmission, &Emission{})
+var _ = blockchain.RegisterTxObject(TxTypeEmission, &Emission{})
+
+var (
+	ErrTxEmptyMediaAddr = errors.New("emission-tx: Empty media address")
+)
 
 func NewEmission(
-	prv *crypto.PrivateKey,
+	emissionKey *crypto.PrivateKey,
 	asset assets.Asset,
 	comment string,
-	vv ...*EmissionOut,
-) *Emission {
-	tx := &Emission{
-		Header:  transaction.NewHeader(TxTypeEmission, 0),
-		Issuer:  prv.PublicKey,
+	vv []*EmissionOut,
+) *blockchain.Transaction {
+	return blockchain.NewTx(emissionKey, &Emission{
 		Asset:   asset,
 		Comment: comment,
 		Outs:    vv,
-	}
-	tx.SetSign(prv)
-	return tx
+	})
 }
 
-func (tx *Emission) SetSign(prv *crypto.PrivateKey) {
-	tx.Sign = prv.Sign(tx.hash())
-}
-
-func (tx *Emission) hash() []byte {
-	return crypto.Hash256(
-		tx.Header,
-		tx.Issuer,
-		tx.Asset,
-		tx.Comment,
-		tx.Outs,
-	)
-}
-
-func (tx *Emission) Encode() []byte {
+func (obj *Emission) Encode() []byte {
 	return bin.Encode(
-		tx.Header,
-		tx.Issuer,
-		tx.Asset,
-		tx.Comment,
-		tx.Outs,
-		tx.Sign,
+		obj.Asset,
+		//obj.Rate,
+		obj.Comment,
+		obj.Outs,
 	)
 }
 
-func (tx *Emission) Decode(data []byte) error {
+func (obj *Emission) Decode(data []byte) error {
 	return bin.Decode(data,
-		&tx.Header,
-		&tx.Issuer,
-		&tx.Asset,
-		&tx.Comment,
-		&tx.Outs,
-		&tx.Sign,
+		&obj.Asset,
+		//&obj.Rate,
+		&obj.Comment,
+		&obj.Outs,
 	)
 }
 
@@ -84,40 +66,65 @@ func (tx *EmissionOut) Encode() []byte {
 	return bin.Encode(
 		tx.Address,
 		tx.Amount,
-		tx.MediaAddr,
-		tx.MediaValue,
+		tx.SourceID,
+		tx.SourceValue,
 	)
 }
 
-func (tx *EmissionOut) Decode(data []byte) error {
+func (out *EmissionOut) Decode(data []byte) error {
 	return bin.Decode(data,
-		&tx.Address,
-		&tx.Amount,
-		&tx.MediaAddr,
-		&tx.MediaValue,
+		&out.Address,
+		&out.Amount,
+		&out.SourceID,
+		&out.SourceValue,
 	)
 }
 
-func (tx *Emission) Verify() error {
-	if !tx.Issuer.Equal(config.EmissionPublicKey) {
-		return ErrTxIncorrectIssuer
+func (obj *Emission) TotalAmount() (s state.Number) {
+	s = state.Int(0)
+	for _, v := range obj.Outs {
+		s.Add(s, v.Amount)
 	}
-	if !tx.Issuer.Verify(tx.hash(), tx.Sign) {
-		return ErrTxIncorrectSign
+	return
+}
+
+func (obj *Emission) OutBySrc(srcID string) *EmissionOut {
+	for _, o := range obj.Outs {
+		if o.SourceID == srcID {
+			return o
+		}
 	}
 	return nil
 }
 
-func (tx *Emission) Execute(st *state.State) {
+func (obj *Emission) Verify(tx *blockchain.Transaction) error {
 
-	coin := tx.Asset
+	if !tx.Sender.Equal(config.EmissionPublicKey) { // Sender of emission-tx must be EmissionPublicKey
+		return ErrTxIncorrectIssuer
+	}
+
+	for _, v := range obj.Outs {
+		if v.SourceID == "" {
+			return ErrTxEmptyMediaAddr
+		}
+	}
+	return nil
+}
+
+func (obj *Emission) Execute(tx *blockchain.Transaction, st *state.State) {
+
+	coin := obj.Asset
 
 	// change state
-	for _, v := range tx.Outs {
+	for _, v := range obj.Outs {
+
 		// set counter of media source
-		st.Set(coin.CoinCounter(v.MediaAddr), crypto.NilAddress, state.Int(v.MediaValue), 0)
+		//st.Set(coin.SourceCounter(v.SourceID), crypto.NilAddress, state.Int(v.SourceValue), 0)
 
 		// add coins to attached address
-		st.Increment(coin, v.Address, state.Int(v.Amount), 0)
+		st.Increment(coin, v.Address, v.Amount, 0)
 	}
+
+	// refresh total supply
+	st.Increment(coin, crypto.NilAddress, obj.TotalAmount(), 0)
 }
