@@ -9,10 +9,9 @@ const (
 )
 
 var (
-	ErrTxIncorrectAmount    = errors.New("txExecError: Incorrect amount")
-	ErrTxIncorrectIssuer    = errors.New("txExecError: Incorrect issuer")
-	ErrTxIncorrectSign      = errors.New("txExecError: Incorrect signature")
-	ErrTxIncorrectAssetType = errors.New("txExecError: Incorrect asset type")
+	ErrTxIncorrectAmount    = errors.New("tx-Error: Incorrect amount")
+	ErrTxIncorrectIssuer    = errors.New("tx-Error: Incorrect issuer")
+	ErrTxIncorrectAssetType = errors.New("tx-Error: Incorrect asset type")
 
 	ErrInvalidUserID = errors.New("invalid userID")
 )
