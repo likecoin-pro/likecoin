@@ -1,100 +1,82 @@
 package object
 
 import (
+	"errors"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
+	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
-	"github.com/likecoin-pro/likecoin/blockchain/transaction"
 	"github.com/likecoin-pro/likecoin/commons/hex"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
 type User struct {
-	transaction.Header
-	Nick       string            `json:"nick"`
-	PubKey     *crypto.PublicKey `json:"pubkey"`
-	ReferrerID hex.Uint64        `json:"referrer"`
-	Data       []byte            `json:"data"`
-	Sign       bin.Bytes         `json:"signature"`
+	Nick       string     `json:"nick"`
+	ReferrerID hex.Uint64 `json:"referrer"`
+	Data       []byte     `json:"data"`
 }
 
-var _ = transaction.Register(TxTypeUser, &User{})
+var _ = blockchain.RegisterTxObject(TxTypeUser, &User{})
 
 func NewUser(
-	prv *crypto.PrivateKey,
+	from *crypto.PrivateKey,
 	nick string,
 	referrerID uint64,
 	data []byte,
-) (t *User) {
-	t = &User{
-		Header:     transaction.NewHeader(TxTypeUser, 0),
+) *blockchain.Transaction {
+	return blockchain.NewTx(from, &User{
 		Nick:       nick,
-		PubKey:     prv.PublicKey,
 		ReferrerID: hex.Uint64(referrerID),
 		Data:       data,
-	}
-	t.SetSign(prv)
-	return
+	})
 }
 
-func (tx *User) ID() uint64 {
-	return tx.PubKey.ID()
+func (obj *User) String() string {
+	return obj.Nick
 }
 
-func (tx *User) Address() crypto.Address {
-	return tx.PubKey.Address()
-}
-
-func (tx *User) hash() []byte {
-	return crypto.Hash256(
-		tx.Header,
-		tx.PubKey,
-		tx.Nick,
-		tx.ReferrerID,
-		tx.Data,
-	)
-}
-
-func (tx *User) SetSign(prv *crypto.PrivateKey) {
-	tx.PubKey = prv.PublicKey
-	tx.Sign = prv.Sign(tx.hash())
-}
-
-func (tx *User) Encode() []byte {
+func (obj *User) Encode() []byte {
 	return bin.Encode(
-		tx.Header,
-		tx.PubKey,
-		tx.Nick,
-		tx.ReferrerID,
-		tx.Data,
-		tx.Sign,
+		obj.Nick,
+		obj.ReferrerID,
+		obj.Data,
 	)
 }
 
-func (tx *User) Decode(data []byte) error {
+func (obj *User) Decode(data []byte) error {
 	return bin.Decode(data,
-		&tx.Header,
-		&tx.PubKey,
-		&tx.Nick,
-		&tx.ReferrerID,
-		&tx.Data,
-		&tx.Sign,
+		&obj.Nick,
+		&obj.ReferrerID,
+		&obj.Data,
 	)
 }
 
-func (tx *User) Verify() error {
-	if !tx.PubKey.Verify(tx.hash(), tx.Sign) {
-		return ErrTxIncorrectSign
+const UserDataSizeLimit = 1000
+
+var (
+	reNick = regexp.MustCompile(`^[a-z][a-z0-9\-]{2,20}$`)
+
+	errInvalidNickname   = errors.New("tx-user-verify: incorrect nickname")
+	errUserDataIsTooLong = errors.New("tx-user-verify: data is too long")
+)
+
+func (obj *User) Verify(tx *blockchain.Transaction) error {
+	if !reNick.MatchString(obj.Nick) {
+		return errInvalidNickname
+	}
+	if len(obj.Data) > UserDataSizeLimit {
+		return errUserDataIsTooLong
 	}
 	return nil
 }
 
-func (tx *User) Execute(st *state.State) {
-	nameAsset := assets.NewName(tx.Nick)
-	userAddr := tx.Address()
+func (obj *User) Execute(tx *blockchain.Transaction, st *state.State) {
+	nameAsset := assets.NewName(obj.Nick)
+	userAddr := tx.SenderAddress()
 
 	// set username as asset to user-address
 	st.Set(nameAsset, userAddr, state.Int(1), 0)
