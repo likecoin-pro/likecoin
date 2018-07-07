@@ -3,56 +3,52 @@ package object
 import (
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
+	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
-	"github.com/likecoin-pro/likecoin/blockchain/transaction"
+	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
 type Transfer struct {
-	transaction.Header
-	From    *crypto.PublicKey `json:"from"`
-	Outs    []*TransferOut    `json:"outs"`
-	Comment string            `json:"comment"`
-	Sign    bin.Bytes         `json:"signature"`
+	Outs    []*TransferOut `json:"outs"`
+	Comment string         `json:"comment"`
 }
 
 type TransferOut struct {
 	Asset     assets.Asset   `json:"asset"`
 	Amount    state.Number   `json:"amount"`
-	Tag       int64          `json:"tag"`
+	Tag       uint64         `json:"tag"`
 	To        crypto.Address `json:"to"`
-	ToTag     int64          `json:"to_tag"`
+	ToTag     uint64         `json:"to_tag"`
 	ToChainID uint64         `json:"to_chain"`
 }
 
-var _ = transaction.Register(TxTypeTransfer, &Transfer{})
+var _ = blockchain.RegisterTxObject(TxTypeTransfer, &Transfer{})
 
 func NewSimpleTransfer(
-	prv *crypto.PrivateKey,
-	to crypto.Address,
-	tag int64,
-	asset assets.Asset,
+	from *crypto.PrivateKey,
+	toAddr crypto.Address,
 	amount state.Number,
+	asset assets.Asset,
 	comment string,
-) (t *Transfer) {
-	t = &Transfer{
-		Header:  transaction.NewHeader(TxTypeTransfer, 0),
+	tag uint64,
+) *blockchain.Transaction {
+	tr := &Transfer{
 		Comment: comment,
 	}
-	t.AddOut(asset, amount, tag, to, tag, t.ChainID)
-	t.SetSign(prv)
-	return
+	tr.AddOut(asset, amount, tag, toAddr, tag, config.ChainID)
+	return blockchain.NewTx(from, tr)
 }
 
-func (tx *Transfer) AddOut(
+func (obj *Transfer) AddOut(
 	asset assets.Asset,
 	amount state.Number,
-	tag int64,
+	tag uint64,
 	to crypto.Address,
-	toTag int64,
+	toTag uint64,
 	toChainID uint64,
 ) {
-	tx.Outs = append(tx.Outs, &TransferOut{
+	obj.Outs = append(obj.Outs, &TransferOut{
 		Asset:     asset,
 		Amount:    amount,
 		Tag:       tag,
@@ -62,39 +58,20 @@ func (tx *Transfer) AddOut(
 	})
 }
 
-func (tx *Transfer) hash() []byte {
-	return crypto.Hash256(
-		tx.Header,
-		tx.From,
-		tx.Outs,
-		tx.Comment,
-	)
-}
-
-func (tx *Transfer) SetSign(prv *crypto.PrivateKey) {
-	tx.From = prv.PublicKey
-	tx.Sign = prv.Sign(tx.hash())
-}
-
-func (tx *Transfer) Encode() []byte {
+func (obj *Transfer) Encode() []byte {
 	return bin.Encode(
-		tx.Header,
-		tx.From,
-		tx.Outs,
-		tx.Comment,
-		tx.Sign,
+		obj.Outs,
+		obj.Comment,
 	)
 }
 
-func (tx *Transfer) Decode(data []byte) error {
+func (obj *Transfer) Decode(data []byte) error {
 	return bin.Decode(data,
-		&tx.Header,
-		&tx.From,
-		&tx.Outs,
-		&tx.Comment,
-		&tx.Sign,
+		&obj.Outs,
+		&obj.Comment,
 	)
 }
+
 func (t *TransferOut) Encode() []byte {
 	return bin.Encode(
 		t.Asset,
@@ -117,9 +94,9 @@ func (t *TransferOut) Decode(data []byte) error {
 	)
 }
 
-func (tx *Transfer) Totals() map[string]state.Number {
+func (obj *Transfer) Totals() map[string]state.Number {
 	vv := map[string]state.Number{}
-	for _, out := range tx.Outs {
+	for _, out := range obj.Outs {
 		sAsset := out.Asset.String()
 		s, ok := vv[sAsset]
 		if !ok {
@@ -130,11 +107,8 @@ func (tx *Transfer) Totals() map[string]state.Number {
 	return vv
 }
 
-func (tx *Transfer) Verify() error {
-	if !tx.From.Verify(tx.hash(), tx.Sign) {
-		return ErrTxIncorrectSign
-	}
-	for _, out := range tx.Outs {
+func (obj *Transfer) Verify(tx *blockchain.Transaction) error {
+	for _, out := range obj.Outs {
 		if out.Amount.Sign() <= 0 {
 			return ErrTxIncorrectAmount
 		}
@@ -142,13 +116,11 @@ func (tx *Transfer) Verify() error {
 	return nil
 }
 
-func (tx *Transfer) Execute(st *state.State) {
-
-	fromAddr := tx.From.Address()
-	for _, out := range tx.Outs {
+func (obj *Transfer) Execute(tx *blockchain.Transaction, st *state.State) {
+	for _, out := range obj.Outs {
 
 		// decrement amount from address; panic if not enough funds
-		st.Decrement(out.Asset, fromAddr, out.Amount, out.Tag)
+		st.Decrement(out.Asset, tx.SenderAddress(), out.Amount, out.Tag)
 
 		// increment amount to new address
 		if tx.ChainID == out.ToChainID {
