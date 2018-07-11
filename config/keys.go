@@ -3,6 +3,6 @@ package config
 import "github.com/likecoin-pro/likecoin/crypto"
 
 var (
-	MasterPublicKey   = crypto.MustParsePublicKey("zcpfb6xF7ByPsnXYsEuiavhEvr9s5xo7oqPsRKY9Avmo")
-	EmissionPublicKey = crypto.MustParsePublicKey("nKhrPuSaM9RysEuY32KvX6haZo9TrMJueqzWUg5QnJpZ")
+	MasterPublicKey   = crypto.MustParsePublicKey("imVtAdXqnXQHCztZjc7AH1QMA6zopNEEt6VZcKowYFda")
+	EmissionPublicKey = crypto.MustParsePublicKey("jN4EFUEY6pYw89RkV3M2XikiqqEud9aLq72Zqx3mKwJL")
 )
