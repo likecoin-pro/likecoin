@@ -5,17 +5,18 @@ import (
 	"testing"
 
 	"github.com/likecoin-pro/likecoin/assets"
-	"github.com/likecoin-pro/likecoin/blockchain/tests"
-	"github.com/likecoin-pro/likecoin/blockchain/transaction"
+	"github.com/likecoin-pro/likecoin/blockchain"
+	"github.com/likecoin-pro/likecoin/blockchain/state"
 	"github.com/likecoin-pro/likecoin/commons/enc"
+	"github.com/likecoin-pro/likecoin/tests"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEmission_Verify(t *testing.T) {
-	tx := NewEmission(tests.MasterKey, assets.LikeCoin, "emission#1",
-		&EmissionOut{tests.AliceAddr, +200, "GDHxcxjUGAs", 200},
-		&EmissionOut{tests.BobAddr, +100, "tDxrdnk4e5g", 100},
-	)
+	tx := NewEmission(tests.MasterKey, assets.Likecoin, "emission#1", []*EmissionOut{
+		{tests.AliceAddr, state.Int(+200), "GDHxcxjUGAs", 200},
+		{tests.BobAddr, state.Int(+100), "tDxrdnk4e5g", 100},
+	})
 
 	err := tx.Verify()
 
@@ -23,138 +24,105 @@ func TestEmission_Verify(t *testing.T) {
 }
 
 func TestEmission_Verify_fail(t *testing.T) {
-	tx := NewEmission(tests.MasterKey, assets.LikeCoin, "emission#1",
-		&EmissionOut{tests.AliceAddr, +200, "GDHxcxjUGAs", 200},
-		&EmissionOut{tests.BobAddr, +100, "tDxrdnk4e5g", 100},
-	)
-	tx.Sign[0] = tx.Sign[0] - 1 // fail sign
+	tx := NewEmission(tests.MasterKey, assets.Likecoin, "emission#1", []*EmissionOut{
+		{tests.AliceAddr, state.Int(+200), "GDHxcxjUGAs", 200},
+		{tests.BobAddr, state.Int(+100), "tDxrdnk4e5g", 100},
+	})
+	tx.Sig[3]++ // corrupt signature
 
 	err := tx.Verify()
 
 	assert.Error(t, err)
 }
 
-func TestEmission_DecodeAsUnknownTx(t *testing.T) {
-	tests.InitRand()
-	txEmission := NewEmission(tests.MasterKey, assets.LikeCoin, "emission#1",
-		&EmissionOut{tests.AliceAddr, +200, "GDHxcxjUGAs", 200},
-		&EmissionOut{tests.BobAddr, +100, "tDxrdnk4e5g", 100},
-	)
-	data := txEmission.Encode()
-
-	var txUnknown = new(transaction.UnknownTransaction)
-	err := txUnknown.Decode(data)
-
-	assert.NoError(t, err)
-	assert.Equal(t, txEmission.GetHeader(), txUnknown.GetHeader())
-	assert.Equal(t, txEmission.Encode(), txUnknown.Encode())
-	assert.Equal(t, transaction.Hash(txEmission), transaction.Hash(txUnknown))
-}
-
 func TestEmission_Decode(t *testing.T) {
-	tests.InitRand()
-	tx := NewEmission(tests.MasterKey, assets.LikeCoin, "emission#1",
-		&EmissionOut{tests.AliceAddr, +200, "GDHxcxjUGAs", 200},
-		&EmissionOut{tests.BobAddr, +100, "tDxrdnk4e5g", 100},
-	)
-	data := tx.Encode()
+	data := NewEmission(tests.MasterKey, assets.Likecoin, "emission#1", []*EmissionOut{
+		{tests.AliceAddr, state.Int(+2e9), "GDHxcxjUGAs", 200},
+		{tests.BobAddr, state.Int(+1e9), "tDxrdnk4e5g", 100},
+	}).Encode()
 
-	var v Emission
-	err := v.Decode(data)
+	var tx blockchain.Transaction
+	err := tx.Decode(data)
 
 	assert.NoError(t, err)
 	assert.NoError(t, tx.Verify())
 	assert.JSONEq(t, `
 	{
-	  "type": 0,
-	  "version": 0,
-	  "network": 1,
-	  "chain": 1,
-	  "asset": "0001",
+	  "asset":   "0x0001",
 	  "comment": "emission#1",
 	  "outs": [
 		{
-		  "address": "Like5A2PEu6eCHQzy1tMsa6b3kc1xXS7ywj2NQZr8xL",
-		  "amount": 200,
-		  "media_uid": "GDHxcxjUGAs",
-		  "media_val": 200
+		  "address": "Like62D4Rq3s8D4Y5Q92YBoRiVpcMFEcXTyGLbqrtAv",
+		  "amount":  2000000000,
+		  "srcID":   "GDHxcxjUGAs",
+		  "srcVal":  200
 		},
 		{
-		  "address": "Like4fGoCMKi9LNqBbAdG3ppFuWRmGDM5bqSsQq9b37",
-		  "amount": 100,
-		  "media_uid": "tDxrdnk4e5g",
-		  "media_val": 100
+		  "address": "Like4ujgQHL98BH21cPowptBCCTtHbAoygbjEU4iYmi",
+		  "amount":  1000000000,
+		  "srcID":   "tDxrdnk4e5g",
+		  "srcVal":  100
 		}
-	  ],
-	  "signature": "8e71d29b331b8f4bc48da180a3777f4efa88b1435f5a8f7381af9dd4d73f9f96e29f9e28ec7065b63bc406db4b2563c7277aa23772ced2530422fb98c9b87d9d"
-	}`, enc.JSON(v))
+	  ]
+  
+	}`, enc.JSON(tx.TxObject()))
 }
 
 func TestEmission_JSONMarshal(t *testing.T) {
-	tests.InitRand()
-	tx := NewEmission(tests.MasterKey, assets.LikeCoin, "emission#1",
-		&EmissionOut{tests.AliceAddr, +200, "GDHxcxjUGAs", 200},
-		&EmissionOut{tests.BobAddr, +100, "tDxrdnk4e5g", 100},
-	)
-	data, err := json.Marshal(tx)
+
+	tx := NewEmission(tests.MasterKey, assets.Likecoin, "emission#1", []*EmissionOut{
+		{tests.AliceAddr, state.Int(+2e9), "GDHxcxjUGAs", 200},
+		{tests.BobAddr, state.Int(+1e9), "tDxrdnk4e5g", 100},
+	})
+
+	data, err := json.Marshal(tx.TxObject())
 
 	assert.NoError(t, err)
 	assert.JSONEq(t, `
 	{
-	  "type": 0,
-	  "version": 0,
-      "network": 1,
-	  "chain": 1,
-	  "asset": "0001",
+      "asset": 	 "0x0001",
 	  "comment": "emission#1",
 	  "outs": [
 		{
-		  "address": "Like5A2PEu6eCHQzy1tMsa6b3kc1xXS7ywj2NQZr8xL",
-		  "amount": 200,
-		  "media_uid": "GDHxcxjUGAs",
-		  "media_val": 200
+		  "address": "Like62D4Rq3s8D4Y5Q92YBoRiVpcMFEcXTyGLbqrtAv",
+		  "amount":  2000000000,
+		  "srcID":   "GDHxcxjUGAs",
+		  "srcVal":  200
 		},
 		{
-		  "address": "Like4fGoCMKi9LNqBbAdG3ppFuWRmGDM5bqSsQq9b37",
-		  "amount": 100,
-		  "media_uid": "tDxrdnk4e5g",
-		  "media_val": 100
+		  "address": "Like4ujgQHL98BH21cPowptBCCTtHbAoygbjEU4iYmi",
+		  "amount":  1000000000,
+		  "srcID":   "tDxrdnk4e5g",
+		  "srcVal":  100
 		}
-	  ],
-	  "signature": "8e71d29b331b8f4bc48da180a3777f4efa88b1435f5a8f7381af9dd4d73f9f96e29f9e28ec7065b63bc406db4b2563c7277aa23772ced2530422fb98c9b87d9d"
+	  ]
 	}`, string(data))
 }
 
 func TestEmission_JSONUnmarshal(t *testing.T) {
 	data := []byte(`
 	{
-	  "type": 0,
-	  "version": 0,
-      "network": 1,
-	  "chain": 1,
-	  "asset": "0001",
+      "asset": 	 "0x0001",
 	  "comment": "emission#1",
 	  "outs": [
 		{
-		  "address": "Like5A2PEu6eCHQzy1tMsa6b3kc1xXS7ywj2NQZr8xL",
-		  "amount": 200,
-		  "media_uid": "GDHxcxjUGAs",
-		  "media_val": 200
+		  "address": "Like62D4Rq3s8D4Y5Q92YBoRiVpcMFEcXTyGLbqrtAv",
+		  "amount":  2000000000,
+		  "srcID":   "GDHxcxjUGAs",
+		  "srcVal":  200
 		},
 		{
-		  "address": "Like4fGoCMKi9LNqBbAdG3ppFuWRmGDM5bqSsQq9b37",
-		  "amount": 100,
-		  "media_uid": "tDxrdnk4e5g",
-		  "media_val": 100
+		  "address": "Like4ujgQHL98BH21cPowptBCCTtHbAoygbjEU4iYmi",
+		  "amount":  1000000000,
+		  "srcID":   "tDxrdnk4e5g",
+		  "srcVal":  100
 		}
-	  ],
-	  "signature": "8e71d29b331b8f4bc48da180a3777f4efa88b1435f5a8f7381af9dd4d73f9f96e29f9e28ec7065b63bc406db4b2563c7277aa23772ced2530422fb98c9b87d9d"
+	  ]
 	}`)
 
-	var tx = new(Emission)
-	err := json.Unmarshal(data, tx)
+	var obj = new(Emission)
+	err := json.Unmarshal(data, obj)
 
 	assert.NoError(t, err)
-	assert.NoError(t, tx.Verify())
-	assert.JSONEq(t, string(data), enc.JSON(tx))
+	assert.JSONEq(t, string(data), enc.JSON(obj))
 }
