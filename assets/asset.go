@@ -40,6 +40,10 @@ func (a Asset) SourceCounter(counterID string) Asset {
 	return NewCounter(a[1], counterID)
 }
 
+func (a Asset) Empty() bool {
+	return len(a) == 0
+}
+
 func (a Asset) Equal(b Asset) bool {
 	return bytes.Equal(a, b)
 }
