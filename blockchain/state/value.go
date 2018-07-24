@@ -3,6 +3,7 @@ package state
 import (
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
+	"github.com/likecoin-pro/likecoin/commons/bignum"
 	"github.com/likecoin-pro/likecoin/commons/enc"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
@@ -11,7 +12,7 @@ type Value struct {
 	ChainID uint64         `json:"chain"`
 	Asset   assets.Asset   `json:"asset"`
 	Address crypto.Address `json:"address"`
-	Balance Number         `json:"balance"`
+	Balance bignum.Int     `json:"balance"`
 	Tag     uint64         `json:"tag"`
 }
 
@@ -23,7 +24,7 @@ func (v *Value) Equal(b *Value) bool {
 	return v.ChainID == b.ChainID &&
 		v.Asset.Equal(b.Asset) &&
 		v.Address == b.Address &&
-		v.Balance.Cmp(b.Balance) == 0 &&
+		v.Balance.Equal(b.Balance) &&
 		v.Tag == b.Tag
 }
 
