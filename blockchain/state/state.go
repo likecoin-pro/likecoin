@@ -2,18 +2,18 @@ package state
 
 import (
 	"errors"
-	"math/big"
 
 	"github.com/likecoin-pro/likecoin/assets"
+	"github.com/likecoin-pro/likecoin/commons/bignum"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
 type State struct {
 	chainID uint64
-	getter  func(assets.Asset, crypto.Address) Number //
+	getter  func(assets.Asset, crypto.Address) bignum.Int //
 
-	vals map[string]Number //
-	sets Values            //
+	vals map[string]bignum.Int //
+	sets Values                //
 }
 
 var (
@@ -21,11 +21,11 @@ var (
 	ErrInvalidKey    = errors.New("blockchain/state: invalid key")
 )
 
-func NewState(chainID uint64, getter func(assets.Asset, crypto.Address) Number) *State {
+func NewState(chainID uint64, getter func(assets.Asset, crypto.Address) bignum.Int) *State {
 	return &State{
 		chainID: chainID,
 		getter:  getter,
-		vals:    map[string]Number{},
+		vals:    map[string]bignum.Int{},
 	}
 }
 
@@ -45,19 +45,16 @@ func strKey(a assets.Asset, addr crypto.Address) string {
 	return string(a) + string(addr[:])
 }
 
-func (s *State) Get(asset assets.Asset, addr crypto.Address) Number {
+func (s *State) Get(asset assets.Asset, addr crypto.Address) bignum.Int {
 	sKey := strKey(asset, addr)
 	val, ok := s.vals[sKey]
 	if !ok {
 		if s.getter != nil {
 			val = s.getter(asset, addr)
 		}
-		if val == nil {
-			val = Int(0)
-		}
 		s.vals[sKey] = val
 	}
-	return new(big.Int).Set(val)
+	return val
 }
 
 func (s *State) Values() Values {
@@ -81,26 +78,24 @@ func (s *State) Apply(vv Values) {
 	}
 }
 
-func (s *State) Set(asset assets.Asset, addr crypto.Address, v Number, tag uint64) {
+func (s *State) Set(asset assets.Asset, addr crypto.Address, v bignum.Int, tag uint64) {
 	s.set(&Value{s.chainID, asset, addr, v, tag})
 }
 
-func (s *State) CrossChainSet(chainID uint64, asset assets.Asset, addr crypto.Address, v Number, tag uint64) {
+func (s *State) CrossChainSet(chainID uint64, asset assets.Asset, addr crypto.Address, v bignum.Int, tag uint64) {
 	s.set(&Value{chainID, asset, addr, v, tag})
 }
 
-func (s *State) Increment(asset assets.Asset, addr crypto.Address, delta Number, tag uint64) {
-	if delta.Sign() == 0 {
+func (s *State) Increment(asset assets.Asset, addr crypto.Address, delta bignum.Int, tag uint64) {
+	if delta.IsZero() {
 		return
 	}
-	v := s.Get(asset, addr)
-	v = v.Add(v, delta)
+	v := s.Get(asset, addr).Add(delta)
 	s.Set(asset, addr, v, tag)
 }
 
-func (s *State) Decrement(asset assets.Asset, addr crypto.Address, delta Number, tag uint64) {
-	v := new(big.Int).Neg(delta)
-	s.Increment(asset, addr, v, tag)
+func (s *State) Decrement(asset assets.Asset, addr crypto.Address, delta bignum.Int, tag uint64) {
+	s.Increment(asset, addr, delta.Neg(), tag)
 }
 
 func (s *State) Fail(err error) {
