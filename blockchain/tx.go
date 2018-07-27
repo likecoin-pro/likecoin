@@ -40,15 +40,18 @@ type Transaction struct {
 	_obj     TxObject //
 }
 
-func NewTx(sender *crypto.PrivateKey, obj TxObject) *Transaction {
+func NewTx(sender *crypto.PrivateKey, nonce uint64, obj TxObject) *Transaction {
+	if nonce == 0 {
+		nonce = uint64(timestamp())
+	}
 	tx := &Transaction{
-		Type:    typeByObject(obj),   //
-		Version: 0,                   //
-		Network: config.NetworkID,    //
-		ChainID: config.ChainID,      //
-		Sender:  sender.PublicKey,    //
-		Nonce:   uint64(timestamp()), //
-		Data:    obj.Encode(),        // encoded tx-object
+		Type:    typeByObject(obj), //
+		Version: 0,                 //
+		Network: config.NetworkID,  //
+		ChainID: config.ChainID,    //
+		Sender:  sender.PublicKey,  //
+		Nonce:   nonce,             //
+		Data:    obj.Encode(),      // encoded tx-object
 	}
 	tx.Sig = sender.Sign(tx.Hash())
 	return tx
