@@ -50,6 +50,17 @@ func NewBlock(
 	prv *crypto.PrivateKey,
 	bc BCContext,
 ) (block *Block, err error) {
+	return NewBlockEx(pre, txs, prv, bc, timestamp(), 0)
+}
+
+func NewBlockEx(
+	pre *Block,
+	txs []*Transaction,
+	prv *crypto.PrivateKey,
+	bc BCContext,
+	timestamp int64,
+	nonce uint64,
+) (block *Block, err error) {
 
 	block = &Block{
 		Version:   0,
@@ -57,8 +68,8 @@ func NewBlock(
 		ChainID:   pre.ChainID,
 		Num:       pre.Num + 1,
 		PrevHash:  pre.Hash(),
-		Timestamp: timestamp(),
-		Nonce:     0,
+		Timestamp: timestamp,
+		Nonce:     nonce,
 		Miner:     prv.PublicKey,
 	}
 
@@ -103,7 +114,7 @@ func (b *Block) String() string {
 	return fmt.Sprintf("[BLOCK-%d 0x%x size:%d]", b.Num, h[:8], b.Size())
 }
 
-// block.Hash + chainRoot
+// block.Hash | chainRoot
 func (b *Block) sigHash() []byte {
 	return merkle.Root(b.Hash(), b.ChainRoot)
 }
