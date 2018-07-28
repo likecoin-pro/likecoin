@@ -6,6 +6,7 @@ import (
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
+	"github.com/likecoin-pro/likecoin/commons/bignum"
 )
 
 var TestCounter = assets.Asset{1}
@@ -37,5 +38,5 @@ func (obj *TestTxObject) Verify(tx *Transaction) error {
 }
 
 func (obj *TestTxObject) Execute(tx *Transaction, st *state.State) {
-	st.Increment(TestCounter, obj.Sender.Address(), state.Int(int64(len(obj.Msg))), 0)
+	st.Increment(TestCounter, obj.Sender.Address(), bignum.NewInt(int64(len(obj.Msg))), 0)
 }
