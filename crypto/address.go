@@ -45,7 +45,7 @@ func (addr Address) String() string {
 	return addr.TaggedString(0)
 }
 
-func (addr Address) IsNil() bool {
+func (addr Address) Empty() bool {
 	return addr == NilAddress
 }
 
@@ -62,7 +62,7 @@ func (addr Address) Hex() string {
 }
 
 func (addr Address) Encode() []byte {
-	if addr.IsNil() {
+	if addr.Empty() {
 		return nil
 	}
 	return addr[:]
@@ -92,7 +92,7 @@ func addrCheckSum(addr []byte, tag uint64) []byte {
 }
 
 func (addr Address) TaggedString(tag uint64) string {
-	if addr.IsNil() {
+	if addr.Empty() {
 		return ""
 	}
 	w := bin.NewBuffer(nil)
