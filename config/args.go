@@ -14,8 +14,8 @@ const (
 // program arguments
 var (
 	// network params
-	NetworkID = 0         // 0-work, 1-test
-	ChainID   = uint64(1) // blockchain ID
+	NetworkID        = 0 // 0-work, 1-test
+	ChainID   uint64 = 1 // blockchain ID
 
 	// program options
 	VerifyTransactions = false                              // by default verify only block-headers
