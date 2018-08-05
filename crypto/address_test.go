@@ -30,7 +30,7 @@ func TestAddress_isValidBase58(t *testing.T) {
 func TestAddress_IsNil(t *testing.T) {
 	var addr Address
 
-	isNil := addr.IsNil()
+	isNil := addr.Empty()
 
 	assert.True(t, isNil)
 }
@@ -142,5 +142,5 @@ func TestAddress_Decode_nilAddress(t *testing.T) {
 	err := addr.Decode(nil)
 
 	assert.NoError(t, err)
-	assert.True(t, addr.IsNil())
+	assert.True(t, addr.Empty())
 }
