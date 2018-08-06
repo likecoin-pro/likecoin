@@ -5,6 +5,7 @@ import (
 	"github.com/likecoin-pro/likecoin/assets"
 	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
+	"github.com/likecoin-pro/likecoin/commons/bignum"
 	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
@@ -16,7 +17,7 @@ type Transfer struct {
 
 type TransferOut struct {
 	Asset     assets.Asset   `json:"asset"`
-	Amount    state.Number   `json:"amount"`
+	Amount    bignum.Int     `json:"amount"`
 	Tag       uint64         `json:"tag"`
 	To        crypto.Address `json:"to"`
 	ToTag     uint64         `json:"to_tag"`
@@ -28,21 +29,22 @@ var _ = blockchain.RegisterTxObject(TxTypeTransfer, &Transfer{})
 func NewSimpleTransfer(
 	from *crypto.PrivateKey,
 	toAddr crypto.Address,
-	amount state.Number,
+	amount bignum.Int,
 	asset assets.Asset,
 	comment string,
 	tag uint64,
+	toTag uint64,
 ) *blockchain.Transaction {
 	tr := &Transfer{
 		Comment: comment,
 	}
-	tr.AddOut(asset, amount, tag, toAddr, tag, config.ChainID)
-	return blockchain.NewTx(from, tr)
+	tr.AddOut(asset, amount, tag, toAddr, toTag, config.ChainID)
+	return blockchain.NewTx(from, 0, tr)
 }
 
 func (obj *Transfer) AddOut(
 	asset assets.Asset,
-	amount state.Number,
+	amount bignum.Int,
 	tag uint64,
 	to crypto.Address,
 	toTag uint64,
@@ -60,6 +62,7 @@ func (obj *Transfer) AddOut(
 
 func (obj *Transfer) Encode() []byte {
 	return bin.Encode(
+		0, // ver
 		obj.Outs,
 		obj.Comment,
 	)
@@ -67,48 +70,49 @@ func (obj *Transfer) Encode() []byte {
 
 func (obj *Transfer) Decode(data []byte) error {
 	return bin.Decode(data,
+		new(int),
 		&obj.Outs,
 		&obj.Comment,
 	)
 }
 
-func (t *TransferOut) Encode() []byte {
+func (out *TransferOut) Encode() []byte {
 	return bin.Encode(
-		t.Asset,
-		t.Amount,
-		t.Tag,
-		t.To,
-		t.ToTag,
-		t.ToChainID,
+		out.Asset,
+		out.Amount,
+		out.Tag,
+		out.To,
+		out.ToTag,
+		out.ToChainID,
 	)
 }
 
-func (t *TransferOut) Decode(data []byte) error {
+func (out *TransferOut) Decode(data []byte) error {
 	return bin.Decode(data,
-		&t.Asset,
-		&t.Amount,
-		&t.Tag,
-		&t.To,
-		&t.ToTag,
-		&t.ToChainID,
+		&out.Asset,
+		&out.Amount,
+		&out.Tag,
+		&out.To,
+		&out.ToTag,
+		&out.ToChainID,
 	)
 }
 
-func (obj *Transfer) Totals() map[string]state.Number {
-	vv := map[string]state.Number{}
+func (obj *Transfer) Totals() map[string]bignum.Int {
+	vv := map[string]bignum.Int{}
 	for _, out := range obj.Outs {
 		sAsset := out.Asset.String()
-		s, ok := vv[sAsset]
-		if !ok {
-			s = state.Int(0)
-		}
-		vv[sAsset] = s.Add(s, out.Amount)
+		vv[sAsset] = vv[sAsset].Add(out.Amount)
 	}
 	return vv
 }
 
 func (obj *Transfer) Verify(tx *blockchain.Transaction) error {
+	sender := tx.SenderAddress()
 	for _, out := range obj.Outs {
+		if out.To.Empty() || out.To.Equal(sender) {
+			return ErrTxIncorrectOutAddress
+		}
 		if out.Amount.Sign() <= 0 {
 			return ErrTxIncorrectAmount
 		}

@@ -10,6 +10,7 @@ import (
 	"github.com/likecoin-pro/likecoin/assets"
 	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
+	"github.com/likecoin-pro/likecoin/commons/bignum"
 	"github.com/likecoin-pro/likecoin/commons/hex"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
@@ -28,7 +29,7 @@ func NewUser(
 	referrerID uint64,
 	data []byte,
 ) *blockchain.Transaction {
-	return blockchain.NewTx(from, &User{
+	return blockchain.NewTx(from, 0, &User{
 		Nick:       nick,
 		ReferrerID: hex.Uint64(referrerID),
 		Data:       data,
@@ -41,6 +42,7 @@ func (obj *User) String() string {
 
 func (obj *User) Encode() []byte {
 	return bin.Encode(
+		0, //ver
 		obj.Nick,
 		obj.ReferrerID,
 		obj.Data,
@@ -49,6 +51,7 @@ func (obj *User) Encode() []byte {
 
 func (obj *User) Decode(data []byte) error {
 	return bin.Decode(data,
+		new(int),
 		&obj.Nick,
 		&obj.ReferrerID,
 		&obj.Data,
@@ -79,7 +82,7 @@ func (obj *User) Execute(tx *blockchain.Transaction, st *state.State) {
 	userAddr := tx.SenderAddress()
 
 	// set username as asset to user-address
-	st.Set(nameAsset, userAddr, state.Int(1), 0)
+	st.Set(nameAsset, userAddr, bignum.NewInt(1), 0)
 }
 
 func ParseUserID(s string) (userID uint64, err error) {

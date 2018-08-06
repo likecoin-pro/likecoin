@@ -7,20 +7,21 @@ import (
 	"github.com/likecoin-pro/likecoin/assets"
 	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
+	"github.com/likecoin-pro/likecoin/commons/bignum"
 	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
 type Emission struct {
 	Asset   assets.Asset   `json:"asset"`   // coin
-	Rate    string         `json:"rate"`    // new like-rate
+	Rate    bignum.Int     `json:"rate"`    // current like rate (in coins)
 	Comment string         `json:"comment"` //
 	Outs    []*EmissionOut `json:"outs"`    //
 }
 
 type EmissionOut struct {
-	Address     crypto.Address `json:"address"` // address linked with media-source
-	Amount      state.Number   `json:"amount"`  // emission amount (in coin)
+	Address     crypto.Address `json:"address"` // address associated with the media-source
+	Delta       int64          `json:"delta"`   //
 	SourceID    string         `json:"srcID"`   // unique media-source ID
 	SourceValue int64          `json:"srcVal"`  // current count likes for media-source
 }
@@ -28,17 +29,22 @@ type EmissionOut struct {
 var _ = blockchain.RegisterTxObject(TxTypeEmission, &Emission{})
 
 var (
-	ErrTxEmptyMediaAddr = errors.New("emission-tx: Empty media address")
+	ErrEmissionTxEmptyAddr      = errors.New("emission-tx: empty address")
+	ErrEmissionTxEmptySourceID  = errors.New("emission-tx: empty source ID")
+	ErrEmissionTxIncorrectRate  = errors.New("emission-tx: incorrect rate")
+	ErrEmissionTxIncorrectDelta = errors.New("emission-tx: incorrect delta")
 )
 
 func NewEmission(
 	emissionKey *crypto.PrivateKey,
 	asset assets.Asset,
+	rate bignum.Int,
 	comment string,
 	vv []*EmissionOut,
 ) *blockchain.Transaction {
-	return blockchain.NewTx(emissionKey, &Emission{
+	return blockchain.NewTx(emissionKey, 0, &Emission{
 		Asset:   asset,
+		Rate:    rate,
 		Comment: comment,
 		Outs:    vv,
 	})
@@ -46,8 +52,9 @@ func NewEmission(
 
 func (obj *Emission) Encode() []byte {
 	return bin.Encode(
+		0, // ver
 		obj.Asset,
-		//obj.Rate,
+		obj.Rate,
 		obj.Comment,
 		obj.Outs,
 	)
@@ -55,43 +62,51 @@ func (obj *Emission) Encode() []byte {
 
 func (obj *Emission) Decode(data []byte) error {
 	return bin.Decode(data,
+		new(int),
 		&obj.Asset,
-		//&obj.Rate,
+		&obj.Rate,
 		&obj.Comment,
 		&obj.Outs,
 	)
 }
 
-func (tx *EmissionOut) Encode() []byte {
+func (out *EmissionOut) Encode() []byte {
 	return bin.Encode(
-		tx.Address,
-		tx.Amount,
-		tx.SourceID,
-		tx.SourceValue,
+		out.Address,
+		out.Delta,
+		out.SourceID,
+		out.SourceValue,
 	)
 }
 
 func (out *EmissionOut) Decode(data []byte) error {
 	return bin.Decode(data,
 		&out.Address,
-		&out.Amount,
+		&out.Delta,
 		&out.SourceID,
 		&out.SourceValue,
 	)
 }
 
-func (obj *Emission) TotalAmount() (s state.Number) {
-	s = state.Int(0)
-	for _, v := range obj.Outs {
-		s.Add(s, v.Amount)
+func (obj *Emission) Amount(delta int64) bignum.Int {
+	return bignum.NewInt(delta).Mul(obj.Rate)
+}
+
+func (obj *Emission) TotalDelta() (likes int64) {
+	for _, out := range obj.Outs {
+		likes += out.Delta
 	}
 	return
 }
 
+func (obj *Emission) TotalAmount() bignum.Int {
+	return obj.Amount(obj.TotalDelta())
+}
+
 func (obj *Emission) OutBySrc(srcID string) *EmissionOut {
-	for _, o := range obj.Outs {
-		if o.SourceID == srcID {
-			return o
+	for _, out := range obj.Outs {
+		if out.SourceID == srcID {
+			return out
 		}
 	}
 	return nil
@@ -100,12 +115,21 @@ func (obj *Emission) OutBySrc(srcID string) *EmissionOut {
 func (obj *Emission) Verify(tx *blockchain.Transaction) error {
 
 	if !tx.Sender.Equal(config.EmissionPublicKey) { // Sender of emission-tx must be EmissionPublicKey
-		return ErrTxIncorrectIssuer
+		return ErrTxIncorrectSender
+	}
+	if obj.Rate.Sign() < 1 {
+		return ErrEmissionTxIncorrectRate
 	}
 
-	for _, v := range obj.Outs {
-		if v.SourceID == "" {
-			return ErrTxEmptyMediaAddr
+	for _, out := range obj.Outs {
+		if out.Delta < 0 || out.SourceValue < 0 || out.Delta > out.SourceValue {
+			return ErrEmissionTxIncorrectDelta
+		}
+		if out.SourceID == "" {
+			return ErrEmissionTxEmptySourceID
+		}
+		if out.Address.Empty() {
+			return ErrEmissionTxEmptyAddr
 		}
 	}
 	return nil
@@ -116,15 +140,8 @@ func (obj *Emission) Execute(tx *blockchain.Transaction, st *state.State) {
 	coin := obj.Asset
 
 	// change state
-	for _, v := range obj.Outs {
-
-		// set counter of media source
-		//st.Set(coin.SourceCounter(v.SourceID), crypto.NilAddress, state.Int(v.SourceValue), 0)
-
+	for _, out := range obj.Outs {
 		// add coins to attached address
-		st.Increment(coin, v.Address, v.Amount, 0)
+		st.Increment(coin, out.Address, obj.Amount(out.Delta), 0)
 	}
-
-	// refresh total supply
-	st.Increment(coin, crypto.NilAddress, obj.TotalAmount(), 0)
 }
