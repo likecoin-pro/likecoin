@@ -24,20 +24,12 @@ func (a Asset) IsCoin() bool {
 	return a.Type() == CoinType
 }
 
-func (a Asset) IsCounter() bool {
-	return a.Type() == CounterType
-}
-
 func (a Asset) IsName() bool {
 	return a.Type() == NameType
 }
 
 func (a Asset) ID() uint8 {
 	return a[1]
-}
-
-func (a Asset) SourceCounter(counterID string) Asset {
-	return NewCounter(a[1], counterID)
 }
 
 func (a Asset) Empty() bool {

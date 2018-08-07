@@ -2,9 +2,8 @@ package assets
 
 // Asset types
 const (
-	CoinType    = 0
-	CounterType = 1
-	NameType    = 2
+	CoinType = 0
+	NameType = 1
 )
 
 var (
@@ -12,10 +11,6 @@ var (
 
 	Default = Likecoin
 )
-
-func NewCounter(typ uint8, id string) Asset {
-	return append(Asset{CounterType, typ}, []byte(id)...)
-}
 
 func NewName(name string) Asset {
 	return append(Asset{NameType}, []byte(name)...)
