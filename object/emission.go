@@ -117,7 +117,7 @@ func (obj *Emission) Verify(tx *blockchain.Transaction) error {
 	if !tx.Sender.Equal(config.EmissionPublicKey) { // Sender of emission-tx must be EmissionPublicKey
 		return ErrTxIncorrectSender
 	}
-	if obj.Rate.Sign() < 1 {
+	if obj.Rate.Sign() < 0 {
 		return ErrEmissionTxIncorrectRate
 	}
 
@@ -128,7 +128,7 @@ func (obj *Emission) Verify(tx *blockchain.Transaction) error {
 		if out.SourceID == "" {
 			return ErrEmissionTxEmptySourceID
 		}
-		if out.Address.Empty() {
+		if out.Address.Empty() && out.Delta > 0 {
 			return ErrEmissionTxEmptyAddr
 		}
 	}
@@ -142,6 +142,8 @@ func (obj *Emission) Execute(tx *blockchain.Transaction, st *state.State) {
 	// change state
 	for _, out := range obj.Outs {
 		// add coins to attached address
-		st.Increment(coin, out.Address, obj.Amount(out.Delta), 0)
+		if !out.Address.Empty() && out.Delta > 0 {
+			st.Increment(coin, out.Address, obj.Amount(out.Delta), 0)
+		}
 	}
 }
