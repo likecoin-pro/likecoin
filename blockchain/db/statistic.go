@@ -20,6 +20,7 @@ type CoinStatistic struct {
 	Likes  int64        `json:"likes"`  //
 	Rate   bignum.Int   `json:"rate"`   //
 	Supply bignum.Int   `json:"supply"` //
+	Volume bignum.Int   `json:"volume"` //
 }
 
 func (s *Statistic) New(blockNum uint64, blockTxs int) *Statistic {
@@ -66,6 +67,7 @@ func (c CoinStatistic) Encode() []byte {
 		c.Likes,
 		c.Rate,
 		c.Supply,
+		c.Volume,
 	)
 }
 
@@ -75,6 +77,7 @@ func (c *CoinStatistic) Decode(data []byte) error {
 		&c.Likes,
 		&c.Rate,
 		&c.Supply,
+		&c.Volume,
 	)
 }
 
@@ -97,10 +100,20 @@ func (s *Statistic) setCoinStat(v CoinStatistic) {
 	s.Coins = append(s.Coins, v)
 }
 
-func (s *Statistic) Refresh(emission *object.Emission) {
+func (s *Statistic) IncSupplyStat(emission *object.Emission) {
 	c := s.CoinStat(emission.Asset)
 	c.Rate = emission.Rate
 	c.Likes += emission.TotalDelta()
 	c.Supply = c.Supply.Add(emission.TotalAmount())
 	s.setCoinStat(c)
+}
+
+func (s *Statistic) IncVolumeStat(tr *object.Transfer) {
+	for _, out := range tr.Outs {
+		if out.Asset.IsCoin() {
+			c := s.CoinStat(out.Asset)
+			c.Volume = c.Volume.Add(out.Amount)
+			s.setCoinStat(c)
+		}
+	}
 }
