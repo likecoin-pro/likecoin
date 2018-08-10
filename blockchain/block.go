@@ -3,8 +3,6 @@ package blockchain
 import (
 	"bytes"
 
-	"fmt"
-
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
 	"github.com/likecoin-pro/likecoin/config"
@@ -14,25 +12,12 @@ import (
 )
 
 type Block struct {
-	Version   int       `json:"version"`       // version
-	Network   int       `json:"network"`       // networkID
-	ChainID   uint64    `json:"chain"`         //
-	Num       uint64    `json:"height"`        // number of block in blockchain
-	Timestamp int64     `json:"timestamp"`     // timestamp of block in µsec
-	PrevHash  bin.Bytes `json:"previous_hash"` // hash of previous block
-	TxRoot    bin.Bytes `json:"tx_root"`       // merkle root of block-transactions
-	StateRoot bin.Bytes `json:"state_root"`    // patricia root of global state
-	ChainRoot bin.Bytes `json:"chain_root"`    // patricia root of chain
+	*BlockHeader
+	Txs []*Transaction `json:"txs"`
+}
 
-	// miner params
-	Nonce uint64            `json:"nonce"` //
-	Miner *crypto.PublicKey `json:"miner"` // miner public-key
-	Sig   bin.Bytes         `json:"sig"`   // miner signature  := minerKey.Sign( blockHash + chainRoot )
-
-	// reserved
-	Reserved1 []byte `json:"-"`
-	Reserved2 []byte `json:"-"`
-	Reserved3 []byte `json:"-"`
+func NewBlock(h *BlockHeader, txs []*Transaction) *Block {
+	return &Block{h, txs}
 }
 
 type BCContext interface {
@@ -44,17 +29,17 @@ type BCContext interface {
 // todo: StateTree() move to *State
 // todo: tx.Execute() -> stateUpdates, stateRoot, err
 
-func NewBlock(
-	pre *Block,
+func GenerateNewBlock(
+	pre *BlockHeader,
 	txs []*Transaction,
 	prv *crypto.PrivateKey,
 	bc BCContext,
 ) (block *Block, err error) {
-	return NewBlockEx(pre, txs, prv, bc, timestamp(), 0)
+	return GenerateNewBlockEx(pre, txs, prv, bc, timestamp(), 0)
 }
 
-func NewBlockEx(
-	pre *Block,
+func GenerateNewBlockEx(
+	pre *BlockHeader,
 	txs []*Transaction,
 	prv *crypto.PrivateKey,
 	bc BCContext,
@@ -62,7 +47,7 @@ func NewBlockEx(
 	nonce uint64,
 ) (block *Block, err error) {
 
-	block = &Block{
+	block = &Block{&BlockHeader{
 		Version:   0,
 		Network:   config.NetworkID,
 		ChainID:   pre.ChainID,
@@ -71,7 +56,7 @@ func NewBlockEx(
 		Timestamp: timestamp,
 		Nonce:     nonce,
 		Miner:     prv.PublicKey,
-	}
+	}, txs}
 
 	st := bc.State()
 	stTree := bc.StateTree()
@@ -87,7 +72,7 @@ func NewBlockEx(
 			}
 		}
 	}
-	block.TxRoot = txRoot(txs)
+	block.TxRoot = block.txRoot()
 	block.StateRoot, err = stTree.Root()
 	if err != nil {
 		return nil, err
@@ -109,122 +94,40 @@ func NewBlockEx(
 	return
 }
 
-func (b *Block) String() string {
-	h := b.Hash()
-	return fmt.Sprintf("[BLOCK-%d 0x%x size:%d]", b.Num, h[:8], b.Size())
-}
-
-// block.Hash | chainRoot
-func (b *Block) sigHash() []byte {
-	return merkle.Root(b.Hash(), b.ChainRoot)
-}
-
-func (b *Block) Hash() []byte {
-	return crypto.Hash256(
-		b.Version,
-		b.ChainID,
-		b.Num,
-		b.Timestamp,
-		b.PrevHash,
-		b.TxRoot,
-		b.StateRoot,
-		b.Nonce,
-		b.Miner,
-		b.Reserved1,
-		b.Reserved2,
-		b.Reserved3,
-	)
-}
-
-// Size returns block-header size
+// Size returns block-header size + txs size
 func (b *Block) Size() int {
 	return len(b.Encode())
 }
 
+func (b *Block) CountTxs() int {
+	return len(b.Txs)
+}
+
 func (b *Block) Encode() []byte {
-	return bin.Encode(
-		b.Version,
-		b.Network,
-		b.ChainID,
-		b.Num,
-		b.Timestamp,
-		b.PrevHash,
-		b.TxRoot,
-		b.StateRoot,
-		b.ChainRoot,
-		b.Nonce,
-		b.Miner,
-		b.Reserved1,
-		b.Reserved2,
-		b.Reserved3,
-		b.Sig,
-	)
+	return bin.Encode(b.BlockHeader, b.Txs)
 }
 
 func (b *Block) Decode(data []byte) (err error) {
-	return bin.Decode(data,
-		&b.Version,
-		&b.Network,
-		&b.ChainID,
-		&b.Num,
-		&b.Timestamp,
-		&b.PrevHash,
-		&b.TxRoot,
-		&b.StateRoot,
-		&b.ChainRoot,
-		&b.Nonce,
-		&b.Miner,
-		&b.Reserved1,
-		&b.Reserved2,
-		&b.Reserved3,
-		&b.Sig,
-	)
+	return bin.Decode(data, &b.BlockHeader, &b.Txs)
 }
 
-func (b *Block) Verify(pre *Block) error {
-	if b.Network != config.NetworkID {
-		return ErrInvalidNetwork
+func (b *Block) Verify(pre *BlockHeader) error {
+	// verify block header
+	if err := b.BlockHeader.VerifyHeader(pre); err != nil {
+		return err
 	}
-	if b.ChainID != config.ChainID {
-		return ErrInvalidChainID
-	}
-	blockHash := b.Hash()
-	if b.Num == 0 && bytes.Equal(blockHash, GenesisBlock().Hash()) { // is genesis
-		return ErrInvalidGenesisBlock
-	}
-	if pre != nil {
-		if b.Network != pre.Network {
-			return ErrInvalidNetwork
-		}
-		if b.ChainID != pre.ChainID {
-			return ErrInvalidChainID
-		}
-		if b.Num != pre.Num+1 {
-			return ErrInvalidBlockNum
-		}
-		if !bytes.Equal(b.PrevHash, pre.Hash()) {
-			return ErrInvalidPrevHash
-		}
-	}
-	if b.Miner.Empty() {
-		return ErrEmptyMinerKey
-	}
-	if !b.Miner.Equal(config.MasterPublicKey) {
-		return ErrInvalidMinerKey
-	}
-	if !b.Miner.Verify(b.sigHash(), b.Sig) {
-		return ErrInvalidBlockSig
+	// verify block txs
+	if err := b.verifyTxs(); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (b *Block) VerifyTxs(txs []*Transaction) error {
-
-	if len(txs) == 0 {
+func (b *Block) verifyTxs() error {
+	if len(b.Txs) == 0 {
 		return ErrEmptyBlock
 	}
-
-	for _, tx := range txs {
+	for _, tx := range b.Txs {
 		// check tx-chain info
 		if tx.ChainID != b.ChainID {
 			return ErrInvalidChainID
@@ -233,15 +136,13 @@ func (b *Block) VerifyTxs(txs []*Transaction) error {
 			return ErrTxInvalidNetworkID
 		}
 	}
-
-	if txRoot := txRoot(txs); !bytes.Equal(b.TxRoot, txRoot) {
+	if txRoot := b.txRoot(); !bytes.Equal(b.TxRoot, txRoot) {
 		return ErrInvalidTxsMerkleRoot
 	}
-
 	return nil
 }
 
-func txRoot(txs []*Transaction) []byte {
+func (b *Block) txRoot() []byte {
 	//tree:=patricia.NewTree(nil)
 	//for idx, it := range txs {
 	//	tree.Put(bin.Encode(idx), it.TxStHash())
@@ -250,7 +151,7 @@ func txRoot(txs []*Transaction) []byte {
 	//return root
 
 	var hh [][]byte
-	for _, it := range txs {
+	for _, it := range b.Txs {
 		hh = append(hh, it.TxStHash())
 	}
 	return merkle.Root(hh...)
