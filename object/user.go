@@ -12,6 +12,7 @@ import (
 	"github.com/likecoin-pro/likecoin/blockchain/state"
 	"github.com/likecoin-pro/likecoin/commons/bignum"
 	"github.com/likecoin-pro/likecoin/commons/hex"
+	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
@@ -58,8 +59,6 @@ func (obj *User) Decode(data []byte) error {
 	)
 }
 
-const UserDataSizeLimit = 1000
-
 var (
 	reNick = regexp.MustCompile(`^[a-z][a-z0-9\-]{2,20}$`)
 
@@ -71,7 +70,7 @@ func (obj *User) Verify(tx *blockchain.Transaction) error {
 	if !reNick.MatchString(obj.Nick) {
 		return errInvalidNickname
 	}
-	if len(obj.Data) > UserDataSizeLimit {
+	if len(obj.Data) > config.TxUserDataSizeLimit {
 		return errUserDataIsTooLong
 	}
 	return nil
