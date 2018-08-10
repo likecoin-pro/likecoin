@@ -9,22 +9,23 @@ import (
 )
 
 type transactionJSON struct {
-	TxID         hex.Uint64        `json:"id"`        //
-	TxHash       hex.Bytes         `json:"hash"`      //
-	BlockNum     uint64            `json:"block_num"` //
-	BlockIdx     int               `json:"block_idx"` //
-	BlockTs      int64             `json:"block_ts"`  //
-	TxSeq        string            `json:"seq"`       //
-	Type         TxType            `json:"type"`      // tx type
-	Version      int               `json:"version"`   // tx version
-	Network      int               `json:"network"`   //
-	ChainID      uint64            `json:"chain"`     //
-	Nonce        uint64            `json:"nonce"`     //
-	Sender       *crypto.PublicKey `json:"sender"`    // tx sender
-	ObjRaw       hex.Bytes         `json:"data"`      // encoded tx-data
-	Obj          TxObject          `json:"obj"`       // unserialized data
-	Sig          hex.Bytes         `json:"sig"`       //
-	StateUpdates state.Values      `json:"state"`     //
+	TxID         hex.Uint64        `json:"id"`             //
+	TxHash       hex.Bytes         `json:"hash"`           //
+	BlockNum     uint64            `json:"block_num"`      //
+	BlockIdx     int               `json:"block_idx"`      //
+	BlockTs      int64             `json:"block_ts"`       //
+	TxSeq        string            `json:"seq"`            //
+	Type         TxType            `json:"type"`           // tx type
+	Version      int               `json:"version"`        // tx version
+	Network      int               `json:"network"`        //
+	ChainID      uint64            `json:"chain"`          //
+	Nonce        uint64            `json:"nonce"`          //
+	Sender       *crypto.PublicKey `json:"sender"`         // tx sender
+	SenderAddr   crypto.Address    `json:"sender_address"` //
+	ObjRaw       hex.Bytes         `json:"data"`           // encoded tx-data
+	Obj          TxObject          `json:"obj"`            // unserialized data
+	Sig          hex.Bytes         `json:"sig"`            //
+	StateUpdates state.Values      `json:"state"`          //
 }
 
 func (tx *Transaction) MarshalJSON() ([]byte, error) {
@@ -39,6 +40,7 @@ func (tx *Transaction) MarshalJSON() ([]byte, error) {
 		ChainID:      tx.ChainID,
 		Nonce:        tx.Nonce,
 		Sender:       tx.Sender,
+		SenderAddr:   tx.SenderAddress(),
 		ObjRaw:       tx.Data,
 		Obj:          obj,
 		TxID:         hex.Uint64(tx.ID()),
