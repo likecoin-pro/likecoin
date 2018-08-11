@@ -125,6 +125,9 @@ func (b *BlockHeader) VerifyHeader(pre *BlockHeader) error {
 		if b.Num != pre.Num+1 {
 			return ErrInvalidBlockNum
 		}
+		if b.Timestamp < pre.Timestamp {
+			return ErrInvalidBlockTs
+		}
 		if !bytes.Equal(b.PrevHash, pre.Hash()) {
 			return ErrInvalidPrevHash
 		}

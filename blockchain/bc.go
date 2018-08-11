@@ -14,6 +14,7 @@ var (
 	ErrInvalidMinerKey      = errors.New("block.Verify-error: invalid miner public key")
 	ErrInvalidBlockSig      = errors.New("block.Verify-error: invalid signature")
 	ErrInvalidBlockNum      = errors.New("block.Verify-error: invalid block num")
+	ErrInvalidBlockTs       = errors.New("block.Verify-error: invalid block timestamp")
 	ErrInvalidNetwork       = errors.New("block.Verify-error: invalid network ID")
 	ErrInvalidChainID       = errors.New("block.Verify-error: invalid chain ID")
 	ErrInvalidPrevHash      = errors.New("block.Verify-error: invalid previous block hash")
@@ -30,7 +31,11 @@ func timestamp() int64 {
 	if testMode {
 		return atomic.AddInt64(&testTimer, 1)
 	}
-	return time.Now().UnixNano() / 1e3
+	return TimeToInt(time.Now())
+}
+
+func TimeToInt(t time.Time) int64 {
+	return t.UnixNano() / 1e3
 }
 
 func init() {
