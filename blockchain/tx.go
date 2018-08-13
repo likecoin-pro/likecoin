@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/denisskin/bin"
@@ -232,8 +233,8 @@ func (tx *Transaction) Verify() error {
 // Execute executes tx, changes state, returns state-updates
 func (tx *Transaction) Execute(s *state.State) (updates state.Values, err error) {
 	defer func() {
-		if r, _ := recover().(error); r != nil {
-			err = r
+		if r := recover(); r != nil {
+			err = fmt.Errorf("tx.Execute-panic: %v", r)
 		}
 	}()
 
