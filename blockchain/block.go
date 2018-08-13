@@ -47,6 +47,19 @@ func GenerateNewBlockEx(
 	nonce uint64,
 ) (block *Block, err error) {
 
+	st := bc.State()
+	var validTxs []*Transaction
+	for _, tx := range txs {
+		if upd, err := tx.Execute(st); err == nil {
+			tx.StateUpdates = upd
+			st.Apply(upd)
+			validTxs = append(validTxs, tx)
+		}
+	}
+	if len(validTxs) == 0 {
+		return nil, nil
+	}
+
 	block = &Block{&BlockHeader{
 		Version:   0,
 		Network:   config.NetworkID,
@@ -56,16 +69,10 @@ func GenerateNewBlockEx(
 		Timestamp: timestamp,
 		Nonce:     nonce,
 		Miner:     prv.PublicKey,
-	}, txs}
+	}, validTxs}
 
-	st := bc.State()
 	stTree := bc.StateTree()
-	for _, tx := range txs {
-		tx.StateUpdates, err = tx.Execute(st)
-		if err != nil {
-			return
-		}
-		st.Apply(tx.StateUpdates)
+	for _, tx := range block.Txs {
 		for _, v := range tx.StateUpdates {
 			if v.ChainID == block.ChainID {
 				stTree.Put(v.StateKey(), v.Balance.Bytes())
