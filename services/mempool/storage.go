@@ -12,8 +12,17 @@ type Storage struct {
 	vals []*blockchain.Transaction
 }
 
+type Info struct {
+	Size int `json:"size"`
+}
+
 func NewStorage() *Storage {
 	return &Storage{}
+}
+
+func (s *Storage) Info() (i Info) {
+	i.Size = s.Size()
+	return
 }
 
 func (s *Storage) Size() int {
