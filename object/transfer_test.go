@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/likecoin-pro/likecoin/blockchain/state"
+	"github.com/likecoin-pro/likecoin/commons/bignum"
 	"github.com/likecoin-pro/likecoin/commons/enc"
-	"github.com/likecoin-pro/likecoin/tests"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTransfer_Verify(t *testing.T) {
-	tx := NewSimpleTransfer(tests.AliceKey, tests.BobAddr, state.Int(100), tests.Coin, "transfer to Bob", 123)
+	tx := NewSimpleTransfer(aliceKey, bobAddr, bignum.NewInt(100), coin, "transfer to Bob", 123, 1456)
 
 	err := tx.Verify()
 
@@ -19,7 +18,7 @@ func TestTransfer_Verify(t *testing.T) {
 }
 
 func TestTransfer_Verify_fail(t *testing.T) {
-	tx := NewSimpleTransfer(tests.AliceKey, tests.BobAddr, state.Int(100), tests.Coin, "transfer to Bob", 123)
+	tx := NewSimpleTransfer(aliceKey, bobAddr, bignum.NewInt(100), coin, "transfer to Bob", 123, 456)
 
 	tx.Sig[3]++ // corrupt sign
 
@@ -29,7 +28,7 @@ func TestTransfer_Verify_fail(t *testing.T) {
 }
 
 func TestTransfer_JSONMarshal(t *testing.T) {
-	tx := NewSimpleTransfer(tests.AliceKey, tests.BobAddr, state.Int(1.5e9), tests.Coin, "transfer to Bob", 123)
+	tx := NewSimpleTransfer(aliceKey, bobAddr, bignum.NewInt(1.5e9), coin, "transfer to Bob", 123, 456)
 
 	data, err := json.Marshal(tx.TxObject())
 
@@ -43,7 +42,7 @@ func TestTransfer_JSONMarshal(t *testing.T) {
 		  "amount": 1500000000,
 		  "tag": 123,
 		  "to": "Like4ujgQHL98BH21cPowptBCCTtHbAoygbjEU4iYmi",
-		  "to_tag": 123,
+		  "to_tag": 456,
 		  "to_chain": 1
 		}
 	  ]
@@ -59,7 +58,7 @@ func TestTransfer_JSONUnmarshal(t *testing.T) {
 		  "amount": 1500000000,
 		  "tag": 123,
 		  "to": "Like4ujgQHL98BH21cPowptBCCTtHbAoygbjEU4iYmi",
-		  "to_tag": 123,
+		  "to_tag": 456,
 		  "to_chain": 1
 		}
 	  ]

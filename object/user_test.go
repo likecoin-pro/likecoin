@@ -5,13 +5,11 @@ import (
 	"testing"
 
 	"github.com/likecoin-pro/likecoin/commons/enc"
-	"github.com/likecoin-pro/likecoin/config"
-	"github.com/likecoin-pro/likecoin/tests"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUser_Verify(t *testing.T) {
-	tx := NewUser(tests.AliceKey, "alice", config.MasterPublicKey.ID(), nil)
+	tx := NewUser(aliceKey, "alice", bobID, nil)
 
 	err := tx.Verify()
 
@@ -19,7 +17,7 @@ func TestUser_Verify(t *testing.T) {
 }
 
 func TestUser_Verify_fail(t *testing.T) {
-	tx := NewUser(tests.AliceKey, "alice", config.MasterPublicKey.ID(), nil)
+	tx := NewUser(aliceKey, "alice", bobID, nil)
 	tx.Sig[3]++ // corrupt signature
 
 	err := tx.Verify()
@@ -28,14 +26,14 @@ func TestUser_Verify_fail(t *testing.T) {
 }
 
 func TestUser_JSONMarshal(t *testing.T) {
-	tx := NewUser(tests.AliceKey, "alice", config.MasterPublicKey.ID(), nil)
+	tx := NewUser(aliceKey, "alice", bobID, nil)
 
 	data, err := json.Marshal(tx.TxObject())
 
 	assert.NoError(t, err)
 	assert.JSONEq(t, `{
 	  "nick":     "alice",
-	  "referrer": "e4a962c20df12faf",
+	  "referrer": "7c14e6734f55d6d5",
 	  "data":     null
 	}`, string(data))
 }
@@ -43,7 +41,7 @@ func TestUser_JSONMarshal(t *testing.T) {
 func TestUser_JSONUnmarshal(t *testing.T) {
 	data := []byte(`{
 	  "nick":      "alice",
-	  "referrer":  "e4a962c20df12faf",
+	  "referrer":  "7c14e6734f55d6d5",
 	  "data":      null
 	}`)
 
