@@ -16,7 +16,7 @@ func TestStatistic_Decode(t *testing.T) {
 		Txs:    123456000,
 		Users:  8888,
 		Coins: []CoinStatistic{
-			{assets.Default, 1e6, bignum.NewInt(1e9), bignum.NewInt(1e12)},
+			{assets.Default, 1e6, bignum.NewInt(1e9), bignum.NewInt(1e12), bignum.NewInt(1e14)},
 		},
 	})
 
@@ -33,7 +33,8 @@ func TestStatistic_Decode(t *testing.T) {
 		  "asset": "0x0001",
 		  "likes": 1000000,
 		  "rate": 1000000000,
-		  "supply": 1000000000000
+		  "supply": 1000000000000,
+		  "volume": 100000000000000
 		}
 	  ]
 	}`, enc.JSON(v))
