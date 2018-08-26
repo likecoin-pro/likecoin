@@ -64,7 +64,7 @@ var (
 	ErrTxInvalidData      = errors.New("tx-verify-error: invalid tx-data")
 	ErrTxInvalidChainID   = errors.New("tx-verify-error: invalid chain-id")
 	ErrTxInvalidNetworkID = errors.New("tx-verify-error: invalid network-id")
-	ErrTxIsTooLong        = errors.New("tx-verify-error: tx is too long")
+	ErrTxDataIsTooLong    = errors.New("tx-verify-error: tx is too long")
 )
 
 func (tx *Transaction) String() string {
@@ -209,11 +209,11 @@ func (tx *Transaction) Verify() error {
 	if len(tx.Data) == 0 {
 		return ErrTxEmptyData
 	}
+	if tx.Type != 0 && len(tx.Data) > config.MaxTxDataSize {
+		return ErrTxDataIsTooLong
+	}
 	if tx.Sender == nil || tx.Sender.Empty() {
 		return ErrTxEmptySender
-	}
-	if len(tx.Encode()) > config.MaxTransactionSize {
-		return ErrTxIsTooLong
 	}
 	txObj, err := tx.Object()
 	if err != nil {
