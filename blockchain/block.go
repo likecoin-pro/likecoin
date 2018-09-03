@@ -48,7 +48,7 @@ func GenerateNewBlockEx(
 ) (block *Block, err error) {
 
 	st := bc.State()
-	var validTxs []*Transaction
+	validTxs := txs[:0]
 	for _, tx := range txs {
 		if upd, err := tx.Execute(st); err == nil {
 			tx.StateUpdates = upd
