@@ -32,7 +32,10 @@ type BlockchainStorage struct {
 	stat         *Statistic        //
 	cacheHeaders *gosync.Cache     // blockNum => *BlockHeader
 	cacheTxs     *gosync.Cache     // blockNum => []*Transaction
+	middleware   []Middleware      //
 }
+
+type Middleware func(*goldb.Transaction, *blockchain.Block)
 
 const (
 	// tables
@@ -98,6 +101,10 @@ func (s *BlockchainStorage) Close() (err error) {
 func (s *BlockchainStorage) Drop() (err error) {
 	s.db.Close()
 	return s.db.Drop()
+}
+
+func (s *BlockchainStorage) AddMiddleware(fn Middleware) {
+	s.middleware = append(s.middleware, fn)
 }
 
 func (s *BlockchainStorage) ChainTree() *patricia.Tree {
@@ -270,6 +277,11 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block, fVerifyTransac
 
 			// save totals
 			tr.PutVar(goldb.Key(dbTabStat, block.Timestamp, block.Num), blockStat)
+
+			// middleware for each block
+			for _, fn := range s.middleware {
+				fn(tr, block)
+			}
 		}
 	})
 
@@ -501,13 +513,18 @@ func (s *BlockchainStorage) FetchTransactions(
 	q.Limit(limit)
 	q.Order(orderDesc)
 
+	var txUID uint64
 	return s.db.Fetch(q, func(rec goldb.Record) error {
-		var _tag, txUID uint64
+		var _tag, _txUID uint64
 		if tag == 0 {
-			rec.MustDecodeKey(&asset, &addr, &txUID)
+			rec.MustDecodeKey(&asset, &addr, &_txUID)
 		} else {
-			rec.MustDecodeKey(&asset, &addr, &_tag, &txUID)
+			rec.MustDecodeKey(&asset, &addr, &_tag, &_txUID)
 		}
+		if txUID == _txUID { // exclude multiple records with the same txUID
+			return nil
+		}
+		txUID = _txUID
 		tx, err := s.transactionByUID(txUID)
 		if err != nil {
 			return err
