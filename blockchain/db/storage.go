@@ -103,6 +103,10 @@ func (s *BlockchainStorage) Drop() (err error) {
 	return s.db.Drop()
 }
 
+func (s *BlockchainStorage) VacuumDB() error {
+	return s.db.Vacuum()
+}
+
 func (s *BlockchainStorage) AddMiddleware(fn Middleware) {
 	s.middleware = append(s.middleware, fn)
 }
