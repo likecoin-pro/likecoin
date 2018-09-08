@@ -494,6 +494,33 @@ func (s *BlockchainStorage) transactionByIdxKey(idxKey []byte) (*blockchain.Tran
 }
 
 func (s *BlockchainStorage) FetchTransactions(
+	offset uint64,
+	limit int64,
+	orderDesc bool,
+	fn func(tx *blockchain.Transaction) error,
+) error {
+	q := goldb.NewQuery(dbTabTxs)
+	if offset > 0 {
+		q.Offset(offset>>32, int(offset&0xffffffff)) // blockNum, txIdx
+	}
+	if limit > 0 {
+		q.Limit(limit)
+	}
+	q.Order(orderDesc)
+	return s.db.Fetch(q, func(rec goldb.Record) error {
+		var blockNum uint64
+		var txIdx int
+		var tx *blockchain.Transaction
+		rec.MustDecodeKey(&blockNum, &txIdx)
+		rec.MustDecode(&tx)
+		if err := s.addBlockInfoToTx(tx, blockNum, txIdx); err != nil {
+			return err
+		}
+		return fn(tx)
+	})
+}
+
+func (s *BlockchainStorage) FetchTransactionsByAddr(
 	asset assets.Asset,
 	addr crypto.Address,
 	tag uint64,
@@ -546,7 +573,7 @@ func (s *BlockchainStorage) QueryTransaction(
 	offset uint64,
 	orderDesc bool,
 ) (tx *blockchain.Transaction, val bignum.Int, err error) {
-	err = s.FetchTransactions(asset, addr, tag, offset, 1, orderDesc, func(t *blockchain.Transaction, v bignum.Int) error {
+	err = s.FetchTransactionsByAddr(asset, addr, tag, offset, 1, orderDesc, func(t *blockchain.Transaction, v bignum.Int) error {
 		tx, val = t, v
 		return goldb.Break
 	})
@@ -561,7 +588,7 @@ func (s *BlockchainStorage) QueryTransactions(
 	limitBlocks int64,
 	orderDesc bool,
 ) (txs []*blockchain.Transaction, err error) {
-	err = s.FetchTransactions(asset, addr, tag, offset, limitBlocks, orderDesc, func(tx *blockchain.Transaction, _ bignum.Int) error {
+	err = s.FetchTransactionsByAddr(asset, addr, tag, offset, limitBlocks, orderDesc, func(tx *blockchain.Transaction, _ bignum.Int) error {
 		txs = append(txs, tx)
 		return nil
 	})
