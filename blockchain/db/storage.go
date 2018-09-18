@@ -62,7 +62,7 @@ var (
 	errTxNotFound            = errors.New("tx not found")
 	errUserHasBeenRegistered = errors.New("user has been registered")
 	errUserNotFound          = errors.New("user not found")
-	errAddrNotFound          = errors.New("address not found")
+	ErrAddrNotFound          = errors.New("address not found")
 	errIncorrectAddress      = errors.New("incorrect address")
 	errIncorrectAssetVal     = errors.New("incorrect asset value")
 	errIncorrectTxState      = errors.New("incorrect tx state")
@@ -598,7 +598,7 @@ func (s *BlockchainStorage) QueryTransactions(
 // AddressByStr returns address by nickname "@nick", "0x<hexUserID>" or by address "LikeXXXXXXXXXXXX"
 func (s *BlockchainStorage) AddressByStr(str string) (addr crypto.Address, tag uint64, err error) {
 	if str == "" {
-		err = errAddrNotFound
+		err = ErrAddrNotFound
 		return
 	}
 	if str[0] == '@' { // address by nickname "@<nickname>"
@@ -678,7 +678,7 @@ func (s *BlockchainStorage) NameAddress(name string) (addr crypto.Address, txUID
 		return
 	}
 	if txUID == 0 {
-		err = errAddrNotFound
+		err = ErrAddrNotFound
 	} else if val.Sign() <= 0 { // state value have to be > 0
 		err = errIncorrectAssetVal
 	}
