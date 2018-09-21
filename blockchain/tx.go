@@ -194,7 +194,7 @@ func (tx *Transaction) Object() (obj TxObject, err error) {
 
 // Timestamp returns user timestamp from nonce
 func (tx *Transaction) Timestamp() time.Time {
-	return time.Unix(0, int64(tx.Nonce)*1e3)
+	return time.Unix(0, int64(tx.blockTs)*1e3)
 }
 
 func (tx *Transaction) Verify() error {
