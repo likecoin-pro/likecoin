@@ -19,10 +19,10 @@ const (
 // program arguments
 var (
 	// blockchain params
-	NetworkID     = 0                                  // 0-work, 1-test
-	ChainID       = uint64(1)                          // blockchain ID
-	DataDir       = os.Getenv("HOME") + "/Likecoin.db" //
-	VerifyTxLevel = VerifyTxLevel1                     // by default verify each tx state in blocks
+	NetworkID     = 0                                // 0-work, 1-test
+	ChainID       = uint64(1)                        // blockchain ID
+	DataDir       = os.Getenv("HOME") + "/likecd.db" //
+	VerifyTxLevel = VerifyTxLevel1                   // by default verify each tx state in blocks
 )
 
 func ParseArgs() {
