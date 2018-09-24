@@ -44,7 +44,7 @@ func (r *Service) loadBlock(num uint64) (ok bool, err error) {
 	if block == nil {
 		return
 	}
-	if err = r.bc.PutBlock(block, true); err != nil {
+	if err = r.bc.PutBlock(block); err != nil {
 		log.Error.Printf("replication> bc.PutBlock. Error: %v", err)
 		return
 	}

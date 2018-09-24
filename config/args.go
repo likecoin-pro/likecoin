@@ -11,16 +11,18 @@ const (
 	ApplicationName = "likecd"
 )
 
+const (
+	VerifyTxLevel0 = 0 // verify only block headers
+	VerifyTxLevel1 = 1 // verify each tx in block
+)
+
 // program arguments
 var (
-	// network params
-	NetworkID        = 0 // 0-work, 1-test
-	ChainID   uint64 = 1 // blockchain ID
-
-	// program options
-	VerifyTransactions = false                              // by default verify only block-headers
-	DataDir            = os.Getenv("HOME") + "/Likecoin.db" //
-	DebugMode          = false                              //
+	// blockchain params
+	NetworkID     = 0                                  // 0-work, 1-test
+	ChainID       = uint64(1)                          // blockchain ID
+	DataDir       = os.Getenv("HOME") + "/Likecoin.db" //
+	VerifyTxLevel = VerifyTxLevel1                     // by default verify each tx state in blocks
 )
 
 func ParseArgs() {
@@ -28,12 +30,10 @@ func ParseArgs() {
 		argHelp    = flag.Bool("help", false, "Show this help")
 		argVersion = flag.Bool("version", false, "Show software version")
 	)
-	flag.IntVar(&NetworkID, "network-id", NetworkID, "NetworkID")
+	flag.IntVar(&NetworkID, "network-id", NetworkID, "NetworkID (0 - work network; 1 - test network")
 	flag.Uint64Var(&ChainID, "chain-id", ChainID, "ChainID")
-	flag.BoolVar(&VerifyTransactions, "verify-tx", VerifyTransactions, "Verify each transactions")
+	flag.IntVar(&VerifyTxLevel, "verify-level", VerifyTxLevel, "Verify tx level (0 - only block headers; 1 - each tx-state)")
 	flag.StringVar(&DataDir, "db", DataDir, "Database dir")
-	//flag.BoolVar(&AutoUpdate, "autoupdate", AutoUpdate, "Autoupdate soft")
-	flag.BoolVar(&DebugMode, "debug", DebugMode, "Debug mode")
 	flag.Parse()
 
 	if *argHelp {

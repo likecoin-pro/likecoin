@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/likecoin-pro/likecoin/config"
+
 	"github.com/denisskin/goldb"
 	"github.com/denisskin/gosync"
 	"github.com/likecoin-pro/likecoin/assets"
@@ -130,12 +132,12 @@ func (s *BlockchainStorage) State() *state.State {
 }
 
 //----------------- put block --------------------------
-func (s *BlockchainStorage) PutBlock(block *blockchain.Block, fVerifyTransactions bool) error {
-	return s.PutBlocks([]*blockchain.Block{block}, fVerifyTransactions)
+func (s *BlockchainStorage) PutBlock(block *blockchain.Block) error {
+	return s.PutBlocks([]*blockchain.Block{block})
 }
 
 // open db.transaction; verify block; save block and index-records
-func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block, fVerifyTransactions bool) error {
+func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 	if len(blocks) == 0 {
 		return nil
 	}
@@ -176,7 +178,7 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block, fVerifyTransac
 					tr.Fail(errTxHasBeenRegistered)
 				}
 
-				if fVerifyTransactions {
+				if config.VerifyTxLevel >= config.VerifyTxLevel1 {
 
 					//-- verify sender signature
 					if err := tx.Verify(); err != nil {
