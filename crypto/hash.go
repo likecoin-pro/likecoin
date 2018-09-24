@@ -2,7 +2,7 @@ package crypto
 
 import (
 	"github.com/denisskin/bin"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/likecoin-pro/likecoin/crypto/sha3"
 )
 
 func HashSum256(data []byte) []byte {

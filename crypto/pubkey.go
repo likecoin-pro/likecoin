@@ -6,8 +6,9 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/likecoin-pro/likecoin/crypto/secp256k1"
+	"github.com/likecoin-pro/likecoin/crypto/sha3"
+
 	"github.com/likecoin-pro/likecoin/crypto/base58"
 	"github.com/likecoin-pro/likecoin/crypto/merkle"
 )
