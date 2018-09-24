@@ -15,8 +15,8 @@ func main() {
 		argHTTPConn = ":8888"
 		argVacuum   = false
 	)
-	flag.StringVar(&argHTTPConn, "http", argHTTPConn, "http-connection")
-	flag.BoolVar(&argVacuum, "vacuum", argVacuum, "vacuum db")
+	flag.StringVar(&argHTTPConn, "http", argHTTPConn, "HTTP-connection string")
+	flag.BoolVar(&argVacuum, "vacuum", argVacuum, "Vacuum db")
 	config.ParseArgs()
 
 	// init blockchain
@@ -31,7 +31,7 @@ func main() {
 	go webapi.StartServer(argHTTPConn, bc)
 
 	// init client and start blockchain-replication
-	cl := client.NewClient("http://likecoin.pro/api/v0")
+	cl := client.NewClient("https://likecoin.pro/api/v0")
 	go replication.NewService(cl, bc).StartReplication()
 
 	select {}
