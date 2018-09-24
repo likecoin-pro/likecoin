@@ -35,8 +35,6 @@ import (
 	"crypto/elliptic"
 	"math/big"
 	"unsafe"
-
-	"github.com/ethereum/go-ethereum/common/math"
 )
 
 /*
@@ -231,8 +229,8 @@ func (BitCurve *BitCurve) ScalarMult(Bx, By *big.Int, scalar []byte) (*big.Int, 
 
 	// Do the multiplication in C, updating point.
 	point := make([]byte, 64)
-	math.ReadBits(Bx, point[:32])
-	math.ReadBits(By, point[32:])
+	ReadBits(Bx, point[:32])
+	ReadBits(By, point[32:])
 	pointPtr := (*C.uchar)(unsafe.Pointer(&point[0]))
 	scalarPtr := (*C.uchar)(unsafe.Pointer(&scalar[0]))
 	res := C.secp256k1_ext_scalar_mul(context, pointPtr, scalarPtr)
@@ -264,8 +262,8 @@ func (BitCurve *BitCurve) Marshal(x, y *big.Int) []byte {
 	byteLen := (BitCurve.BitSize + 7) >> 3
 	ret := make([]byte, 1+2*byteLen)
 	ret[0] = 4 // uncompressed point flag
-	math.ReadBits(x, ret[1:1+byteLen])
-	math.ReadBits(y, ret[1+byteLen:])
+	ReadBits(x, ret[1:1+byteLen])
+	ReadBits(y, ret[1+byteLen:])
 	return ret
 }
 
@@ -301,4 +299,24 @@ func init() {
 // S256 returns a BitCurve which implements secp256k1.
 func S256() *BitCurve {
 	return theCurve
+}
+
+const (
+	// number of bits in a big.Word
+	wordBits = 32 << (uint64(^big.Word(0)) >> 63)
+	// number of bytes in a big.Word
+	wordBytes = wordBits / 8
+)
+
+// ReadBits encodes the absolute value of bigint as big-endian bytes. Callers must ensure
+// that buf has enough space. If buf is too short the result will be incomplete.
+func ReadBits(bigint *big.Int, buf []byte) {
+	i := len(buf)
+	for _, d := range bigint.Bits() {
+		for j := 0; j < wordBytes && i > 0; j++ {
+			i--
+			buf[i] = byte(d)
+			d >>= 8
+		}
+	}
 }

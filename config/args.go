@@ -8,7 +8,7 @@ import (
 
 const (
 	Version         = "0.1"
-	ApplicationName = "likecoin-core"
+	ApplicationName = "likecd"
 )
 
 // program arguments
