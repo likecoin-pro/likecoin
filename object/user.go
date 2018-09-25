@@ -25,12 +25,13 @@ type User struct {
 var _ = blockchain.RegisterTxObject(TxTypeUser, &User{})
 
 func NewUser(
+	cfg *blockchain.Config,
 	from *crypto.PrivateKey,
 	nick string,
 	referrerID uint64,
 	data []byte,
 ) *blockchain.Transaction {
-	return blockchain.NewTx(from, 0, &User{
+	return blockchain.NewTx(cfg, from, 0, &User{
 		Nick:       nick,
 		ReferrerID: hex.Uint64(referrerID),
 		Data:       data,

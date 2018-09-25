@@ -6,7 +6,6 @@ import (
 	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
 	"github.com/likecoin-pro/likecoin/commons/bignum"
-	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
 
@@ -27,6 +26,7 @@ type TransferOut struct {
 var _ = blockchain.RegisterTxObject(TxTypeTransfer, &Transfer{})
 
 func NewSimpleTransfer(
+	cfg *blockchain.Config,
 	from *crypto.PrivateKey,
 	toAddr crypto.Address,
 	amount bignum.Int,
@@ -38,8 +38,8 @@ func NewSimpleTransfer(
 	tr := &Transfer{
 		Comment: comment,
 	}
-	tr.AddOut(asset, amount, tag, toAddr, toTag, config.ChainID)
-	return blockchain.NewTx(from, 0, tr)
+	tr.AddOut(asset, amount, tag, toAddr, toTag, cfg.ChainID)
+	return blockchain.NewTx(cfg, from, 0, tr)
 }
 
 func (obj *Transfer) AddOut(

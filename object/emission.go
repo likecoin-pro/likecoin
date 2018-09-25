@@ -36,13 +36,14 @@ var (
 )
 
 func NewEmission(
+	cfg *blockchain.Config,
 	emissionKey *crypto.PrivateKey,
 	asset assets.Asset,
 	rate bignum.Int,
 	comment string,
 	vv []*EmissionOut,
 ) *blockchain.Transaction {
-	return blockchain.NewTx(emissionKey, 0, &Emission{
+	return blockchain.NewTx(cfg, emissionKey, 0, &Emission{
 		Asset:   asset,
 		Rate:    rate,
 		Comment: comment,
