@@ -1,8 +1,7 @@
 package main
 
 import (
-	"flag"
-
+	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/db"
 	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/services/client"
@@ -11,24 +10,16 @@ import (
 )
 
 func main() {
-	var (
-		argHTTPConn = ":8888"
-		argVacuum   = false
-	)
-	flag.StringVar(&argHTTPConn, "http", argHTTPConn, "HTTP-connection string")
-	flag.BoolVar(&argVacuum, "vacuum", argVacuum, "Vacuum db")
+	// config
+	apiCfg := webapi.NewConfig()
+	bcCfg := blockchain.NewConfig()
 	config.ParseArgs()
 
 	// init blockchain
-	bc := db.NewBlockchainStorage(config.ChainID, config.DataDir)
-
-	// vacuum blockchain-db
-	if argVacuum {
-		bc.VacuumDB()
-	}
+	bc := db.NewBlockchainStorage(bcCfg)
 
 	// start web-server
-	go webapi.StartServer(argHTTPConn, bc)
+	go webapi.StartServer(apiCfg, bc)
 
 	// init client and start blockchain-replication
 	cl := client.NewClient("https://likecoin.pro/api/v0")
