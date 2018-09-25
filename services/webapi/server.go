@@ -9,20 +9,24 @@ import (
 )
 
 type WebServer struct {
-	bc *db.BlockchainStorage
+	cfg *Config
+	bc  *db.BlockchainStorage
 }
 
-func StartServer(connStr string, bc *db.BlockchainStorage) error {
-	s := &WebServer{bc: bc}
-	return s.Start(connStr)
+func StartServer(cfg *Config, bc *db.BlockchainStorage) error {
+	s := &WebServer{
+		cfg: cfg,
+		bc:  bc,
+	}
+	return s.Start()
 }
 
-func (s *WebServer) Start(connStr string) error {
+func (s *WebServer) Start() error {
 
-	log.Info.Printf("HTTP: Start Server: %s", connStr)
+	log.Info.Printf("webapi> Start Server: %s", s.cfg.HTTPConnStr)
 
 	server := &http.Server{
-		Addr:           connStr,
+		Addr:           s.cfg.HTTPConnStr,
 		Handler:        s,
 		ReadTimeout:    30 * time.Second,
 		WriteTimeout:   30 * time.Second,

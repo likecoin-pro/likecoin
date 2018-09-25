@@ -150,8 +150,8 @@ func (ctx *Context) Exec() {
 		amount := ctx.getAmount("amount")      // amount
 		comment := ctx.Get("comment", "")      // comment
 
-		tx := object.NewSimpleTransfer(prv, addr, amount, asset, comment, 0, toTag)
-		if err := tx.Verify(); err != nil {
+		tx := object.NewSimpleTransfer(ctx.bc.Cfg, prv, addr, amount, asset, comment, 0, toTag)
+		if err := tx.Verify(ctx.bc.Cfg); err != nil {
 			ctx.Panic400(err)
 		}
 		ctx.bc.Mempool.Put(tx)
@@ -166,8 +166,8 @@ func (ctx *Context) Exec() {
 		nick := ctx.Get("nick", "")        // users nickname
 		refID := ctx.getUint("ref", 0, 16) // referrer
 
-		tx := object.NewUser(prv, nick, refID, nil)
-		if err := tx.Verify(); err != nil {
+		tx := object.NewUser(ctx.bc.Cfg, prv, nick, refID, nil)
+		if err := tx.Verify(ctx.bc.Cfg); err != nil {
 			ctx.Panic400(err)
 		}
 		ctx.bc.Mempool.Put(tx)
