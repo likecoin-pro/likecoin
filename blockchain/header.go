@@ -104,15 +104,15 @@ func (b *BlockHeader) Decode(data []byte) (err error) {
 	)
 }
 
-func (b *BlockHeader) VerifyHeader(pre *BlockHeader) error {
-	if b.Network != config.NetworkID {
+func (b *BlockHeader) VerifyHeader(pre *BlockHeader, cfg *Config) error {
+	if b.Network != cfg.NetworkID {
 		return ErrInvalidNetwork
 	}
-	if b.ChainID != config.ChainID {
+	if b.ChainID != cfg.ChainID {
 		return ErrInvalidChainID
 	}
 	blockHash := b.Hash()
-	if b.Num == 0 && bytes.Equal(blockHash, GenesisBlockHeader().Hash()) { // is genesis
+	if b.Num == 0 && bytes.Equal(blockHash, GenesisBlockHeader(cfg).Hash()) { // is genesis
 		return ErrInvalidGenesisBlock
 	}
 	if pre != nil {

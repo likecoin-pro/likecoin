@@ -5,7 +5,6 @@ import (
 
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/blockchain/state"
-	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/crypto"
 	"github.com/likecoin-pro/likecoin/crypto/merkle"
 	"github.com/likecoin-pro/likecoin/crypto/patricia"
@@ -62,7 +61,7 @@ func GenerateNewBlockEx(
 
 	block = &Block{&BlockHeader{
 		Version:   0,
-		Network:   config.NetworkID,
+		Network:   pre.Network,
 		ChainID:   pre.ChainID,
 		Num:       pre.Num + 1,
 		PrevHash:  pre.Hash(),
@@ -118,9 +117,9 @@ func (b *Block) Decode(data []byte) (err error) {
 	return bin.Decode(data, &b.BlockHeader, &b.Txs)
 }
 
-func (b *Block) Verify(pre *BlockHeader) error {
+func (b *Block) Verify(pre *BlockHeader, bcCfg *Config) error {
 	// verify block header
-	if err := b.BlockHeader.VerifyHeader(pre); err != nil {
+	if err := b.BlockHeader.VerifyHeader(pre, bcCfg); err != nil {
 		return err
 	}
 	// verify block txs

@@ -13,7 +13,7 @@ type Info struct {
 }
 
 func (s *BlockchainStorage) Info() (inf Info, err error) {
-	inf.ChainID = s.chainID
+	inf.ChainID = s.Cfg.ChainID
 	inf.Stat = s.Totals()
 	inf.LastBlock = s.LastBlock().BlockHeader
 	inf.Mempool = s.Mempool.Info()

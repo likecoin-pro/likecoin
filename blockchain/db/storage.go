@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/likecoin-pro/likecoin/config"
-
 	"github.com/denisskin/goldb"
 	"github.com/denisskin/gosync"
 	"github.com/likecoin-pro/likecoin/assets"
@@ -23,7 +21,7 @@ import (
 )
 
 type BlockchainStorage struct {
-	chainID uint64
+	Cfg     *blockchain.Config
 	db      *goldb.Storage
 	Mempool *mempool.Storage
 
@@ -72,13 +70,17 @@ var (
 	errIncorrectStateRoot    = errors.New("incorrect state root")
 )
 
-func NewBlockchainStorage(chainID uint64, dir string) (s *BlockchainStorage) {
+func NewBlockchainStorage(cfg *blockchain.Config) (s *BlockchainStorage) {
 	s = &BlockchainStorage{
-		chainID:      chainID,
-		db:           goldb.NewStorage(dir, nil),
+		Cfg:          cfg,
+		db:           goldb.NewStorage(cfg.DataDir, nil),
 		cacheHeaders: gosync.NewCache(10000),
 		cacheTxs:     gosync.NewCache(1000),
 		Mempool:      mempool.NewStorage(),
+	}
+
+	if cfg.VacuumDB {
+		s.db.Vacuum()
 	}
 
 	// query last block
@@ -123,7 +125,7 @@ func (s *BlockchainStorage) StateTree() *patricia.Tree {
 
 // State returns state struct from db
 func (s *BlockchainStorage) State() *state.State {
-	return state.NewState(s.chainID, func(a assets.Asset, addr crypto.Address) (v bignum.Int) {
+	return state.NewState(s.Cfg.ChainID, func(a assets.Asset, addr crypto.Address) (v bignum.Int) {
 		if err := s.db.QueryValue(goldb.NewQuery(dbIdxAssetAddr, a, addr).Last(), &v); err != nil {
 			panic(err)
 		}
@@ -148,7 +150,7 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 	// verify blocks
 	lastBlockHeader := s.lastBlock.BlockHeader
 	for _, block := range blocks {
-		if err := block.Verify(lastBlockHeader); err != nil {
+		if err := block.Verify(lastBlockHeader, s.Cfg); err != nil {
 			return err
 		}
 		lastBlockHeader = block.BlockHeader
@@ -178,16 +180,16 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 					tr.Fail(errTxHasBeenRegistered)
 				}
 
-				if config.VerifyTxLevel >= config.VerifyTxLevel1 {
+				if s.Cfg.VerifyTxsLevel >= blockchain.VerifyTxLevel1 {
 
 					//-- verify sender signature
-					if err := tx.Verify(); err != nil {
+					if err := tx.Verify(s.Cfg); err != nil {
 						tr.Fail(err)
 					}
 
 					//-- verify transaction state
 					// make state by dbTransaction
-					st := state.NewState(s.chainID, func(a assets.Asset, addr crypto.Address) (v bignum.Int) {
+					st := state.NewState(s.Cfg.ChainID, func(a assets.Asset, addr crypto.Address) (v bignum.Int) {
 						// get state from db
 						tr.QueryValue(goldb.NewQuery(dbIdxAssetAddr, a, addr).Last(), &v)
 						return
@@ -251,7 +253,7 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 
 				// save state to db-storage
 				for stIdx, v := range tx.StateUpdates {
-					if v.ChainID == s.chainID {
+					if v.ChainID == s.Cfg.ChainID {
 						stateTree.Put(v.StateKey(), v.Balance.Bytes())
 
 						if v.Asset.IsName() {
@@ -354,7 +356,7 @@ func (s *BlockchainStorage) queryLastBlock() (block *blockchain.Block, err error
 		return nil
 	})
 	if err == nil && block == nil {
-		block = blockchain.NewBlock(blockchain.GenesisBlockHeader(), nil)
+		block = blockchain.NewBlock(blockchain.GenesisBlockHeader(s.Cfg), nil)
 	}
 	return
 }
@@ -373,7 +375,7 @@ func (s *BlockchainStorage) GetBlock(num uint64) (block *blockchain.Block, err e
 
 func (s *BlockchainStorage) BlockHeader(num uint64) (h *blockchain.BlockHeader, err error) {
 	if num == 0 {
-		return blockchain.GenesisBlockHeader(), nil
+		return blockchain.GenesisBlockHeader(s.Cfg), nil
 	}
 	if h, _ = s.cacheHeaders.Get(num).(*blockchain.BlockHeader); h != nil {
 		return

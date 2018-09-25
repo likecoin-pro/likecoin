@@ -41,15 +41,15 @@ type Transaction struct {
 	_obj     TxObject //
 }
 
-func NewTx(sender *crypto.PrivateKey, nonce uint64, obj TxObject) *Transaction {
+func NewTx(cfg *Config, sender *crypto.PrivateKey, nonce uint64, obj TxObject) *Transaction {
 	if nonce == 0 {
 		nonce = uint64(timestamp())
 	}
 	tx := &Transaction{
 		Type:    typeByObject(obj), //
 		Version: 0,                 //
-		Network: config.NetworkID,  //
-		ChainID: config.ChainID,    //
+		Network: cfg.NetworkID,     //
+		ChainID: cfg.ChainID,       //
 		Sender:  sender.PublicKey,  //
 		Nonce:   nonce,             //
 		Data:    obj.Encode(),      // encoded tx-object
@@ -197,13 +197,13 @@ func (tx *Transaction) Timestamp() time.Time {
 	return time.Unix(0, int64(tx.blockTs)*1e3)
 }
 
-func (tx *Transaction) Verify() error {
+func (tx *Transaction) Verify(cfg *Config) error {
 
 	//-- verify transaction data
-	if tx.Network != config.NetworkID {
+	if tx.Network != cfg.NetworkID {
 		return ErrTxInvalidNetworkID
 	}
-	if tx.ChainID != config.ChainID {
+	if tx.ChainID != cfg.ChainID {
 		return ErrTxInvalidChainID
 	}
 	if len(tx.Data) == 0 {

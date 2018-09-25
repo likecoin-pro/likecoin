@@ -2,12 +2,12 @@ package blockchain
 
 import "github.com/likecoin-pro/likecoin/config"
 
-func GenesisBlockHeader() *BlockHeader {
+func GenesisBlockHeader(cfg *Config) *BlockHeader {
 	return &BlockHeader{
 		Version:   0,
 		Num:       0,
-		ChainID:   config.ChainID,
-		Network:   config.NetworkID,
+		ChainID:   cfg.ChainID,
+		Network:   cfg.NetworkID,
 		Timestamp: 0,
 		PrevHash:  nil,
 		TxRoot:    nil,
