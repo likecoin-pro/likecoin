@@ -146,7 +146,7 @@ func (ctx *Context) Exec() {
 		}
 
 	case path == "/new-transfer":
-		prv := ctx.getPrvKey()                  // prv OR secret
+		prv := ctx.getPrvKey()                  // prv OR seed
 		addr, toMemo, asset := ctx.getAddress() // address
 		amount := ctx.getAmount("amount")       // amount
 		comment := ctx.Get("comment", "")       // comment
@@ -157,6 +157,24 @@ func (ctx *Context) Exec() {
 		}
 		ctx.bc.Mempool.Put(tx)
 		ctx.WriteObject(tx)
+
+	case path == "/new-key":
+		prv := ctx.getPrvKey() // prv OR seed
+		memo := ctx.getMemo()
+		addr := prv.PublicKey.Address()
+		ctx.WriteObject(struct {
+			PrvKey      string `json:"private_key"`
+			PubKey      string `json:"public_key"`
+			Address     string `json:"address"`
+			Memo        string `json:"memo"`
+			MemoAddress string `json:"memo_address"`
+		}{
+			prv.String(),
+			prv.PublicKey.String(),
+			addr.String(),
+			"0x" + hex2.EncodeUint(memo),
+			addr.MemoString(memo),
+		})
 
 	case path == "/memo-address":
 		addr, memo, _ := ctx.getAddress() // address
@@ -472,6 +490,9 @@ func (c *Context) getMemo() uint64 {
 }
 
 func (c *Context) getPrvKey() *crypto.PrivateKey {
+	if seed := c.Get("seed", ""); seed != "" {
+		return crypto.NewPrivateKeyBySecret(seed)
+	}
 	prv, err := crypto.ParsePrivateKey(c.Get("prv", ""))
 	if err != nil {
 		c.Panic400Str("incorrect prv-param")
