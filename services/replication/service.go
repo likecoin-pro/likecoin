@@ -1,6 +1,7 @@
 package replication
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/likecoin-pro/likecoin/services/client"
@@ -23,31 +24,35 @@ func NewService(client *client.Client, bc *db.BlockchainStorage) *Service {
 
 func (r *Service) StartReplication() {
 	for {
-		ok, err := r.loadBlock(r.bc.LastBlock().Num + 1)
+		ok, err := r.loadBatch(r.bc.LastBlock().Num, 100)
 		if err != nil {
-			log.Error.Printf("replication> loadBlock Error: %v", err)
+			log.Error.Printf("replication> loadBatch Error: %v", err)
 		}
 		if !ok || err != nil {
-			//log.Error.Printf("replication> sleep...")
-			print(".")
-			time.Sleep(1e9)
+			time.Sleep(time.Second)
 		}
 	}
 }
 
-func (r *Service) loadBlock(num uint64) (ok bool, err error) {
-	block, err := r.client.GetBlock(num)
+func (r *Service) loadBatch(blockOffset uint64, batchSize int) (ok bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("replication.loadBatch-Panic: %v", r)
+		}
+	}()
+
+	blocks, err := r.client.GetBlocks(blockOffset, batchSize)
 	if err != nil {
-		log.Error.Printf("replication> client.GetBlock. Error: %v", err)
+		log.Error.Printf("replication> client.GetBlocks. Error: %v", err)
 		return
 	}
-	if block == nil {
+	if len(blocks) == 0 {
 		return
 	}
-	if err = r.bc.PutBlock(block); err != nil {
-		log.Error.Printf("replication> bc.PutBlock. Error: %v", err)
+	if err = r.bc.PutBlocks(blocks); err != nil {
+		log.Error.Printf("replication> bc.PutBlocks. Error: %v", err)
 		return
 	}
-	log.Printf("replication> ✅ replicated block#%d ", num)
+	log.Printf("replication> ✅ replicated block#%d ", blocks[len(blocks)-1].Num)
 	return true, nil
 }
