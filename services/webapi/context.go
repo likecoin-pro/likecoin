@@ -16,6 +16,7 @@ import (
 	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/db"
 	"github.com/likecoin-pro/likecoin/commons/bignum"
+	hex2 "github.com/likecoin-pro/likecoin/commons/hex"
 	"github.com/likecoin-pro/likecoin/commons/log"
 	"github.com/likecoin-pro/likecoin/crypto"
 	"github.com/likecoin-pro/likecoin/object"
@@ -71,7 +72,7 @@ API /v0/
 ./txs   						-> [{tx},...]
 	&address=<address>
 	&asset=<asset:hex>
-	&tag=<tag:int>
+	&memo=<memo:uint64>
 	&offset=<ts:int>
 	&limit=<limit:int>
 	&order=asc|desc
@@ -82,7 +83,7 @@ API /v0/
 ./user/@<username>				-> {userTx}
 
 ./address/<address>				-> {addressInfo, balance}
-	&tag
+	&memo
 	&asset
 
 <address> := "LikeXXXXXXXXXXXXXX" | <pubKey:base58> | @<nick> | 0x<userID:hex>
@@ -145,21 +146,29 @@ func (ctx *Context) Exec() {
 		}
 
 	case path == "/new-transfer":
-		prv := ctx.getPrvKey()                 // prv OR secret
-		addr, toTag, asset := ctx.getAddress() // address
-		amount := ctx.getAmount("amount")      // amount
-		comment := ctx.Get("comment", "")      // comment
+		prv := ctx.getPrvKey()                  // prv OR secret
+		addr, toMemo, asset := ctx.getAddress() // address
+		amount := ctx.getAmount("amount")       // amount
+		comment := ctx.Get("comment", "")       // comment
 
-		tx := object.NewSimpleTransfer(ctx.bc.Cfg, prv, addr, amount, asset, comment, 0, toTag)
+		tx := object.NewSimpleTransfer(ctx.bc.Cfg, prv, addr, amount, asset, comment, 0, toMemo)
 		if err := tx.Verify(ctx.bc.Cfg); err != nil {
 			ctx.Panic400(err)
 		}
 		ctx.bc.Mempool.Put(tx)
 		ctx.WriteObject(tx)
 
-	//case path == "/new-address":
-	//	addr, tag, _ := ctx.getAddress() // address
-	//	ctx.WriteObject(tx)
+	case path == "/memo-address":
+		addr, memo, _ := ctx.getAddress() // address
+		ctx.WriteObject(struct {
+			Address     string `json:"address"`
+			Memo        string `json:"memo"`
+			MemoAddress string `json:"memo_address"`
+		}{
+			addr.String(),
+			"0x" + hex2.EncodeUint(memo),
+			addr.MemoString(memo),
+		})
 
 	case path == "/new-user":
 		prv := ctx.getPrvKey()             // prv OR secret
@@ -184,10 +193,10 @@ func (ctx *Context) Exec() {
 
 	// 	/txs/<address>  OR   /address/<address>/txs
 	case pathMatch(reTxsAddr) || pathMatch(reAddrTxs):
-		addr, tag, asset, offset, limit, order := ctx.parseQueryParams(q[1])
+		addr, memo, asset, offset, limit, order := ctx.parseQueryParams(q[1])
 		strm := ctx.OpenStream()
 		defer strm.Close()
-		ctx.bc.FetchTransactionsByAddr(asset, addr, tag, offset, limit, order, func(tx *blockchain.Transaction, _ bignum.Int) error {
+		ctx.bc.FetchTransactionsByAddr(asset, addr, memo, offset, limit, order, func(tx *blockchain.Transaction, _ bignum.Int) error {
 			return strm.WriteObject(tx)
 		})
 
@@ -222,11 +231,11 @@ func (ctx *Context) Exec() {
 		id, _ := strconv.ParseUint(q[1], 16, 64)
 		ctx.WriteObject(ctx.bc.TransactionByID(id))
 
-		// 	/address?address&tag&asset
+		// 	/address?address&memo&asset
 	case path == "/address":
 		ctx.WriteObject(ctx.bc.AddressInfo(ctx.getAddress()))
 
-		// 	/address/<address>?tag&asset
+		// 	/address/<address>?memo&asset
 	case pathMatch(reAddrInfo):
 		ctx.WriteObject(ctx.bc.AddressInfo(ctx.parseAddress(q[1])))
 
@@ -454,12 +463,12 @@ func (c *Context) getUint(name string, defaultVal uint64, base int) uint64 {
 	return defaultVal
 }
 
-func (c *Context) getAddress() (addr crypto.Address, tag uint64, asset assets.Asset) {
+func (c *Context) getAddress() (addr crypto.Address, memo uint64, asset assets.Asset) {
 	return c.parseAddress(c.Get("address", ""))
 }
 
-func (c *Context) getTag() uint64 {
-	return c.getUint("tag", 0, 0)
+func (c *Context) getMemo() uint64 {
+	return c.getUint("memo", 0, 0)
 }
 
 func (c *Context) getPrvKey() *crypto.PrivateKey {
@@ -518,9 +527,9 @@ func (c *Context) getOrder(defaultValue string) (desc bool) {
 	return
 }
 
-func (c *Context) parseQueryParams(sAddr string) (addr crypto.Address, tag uint64, asset assets.Asset, offset uint64, limit int64, order bool) {
+func (c *Context) parseQueryParams(sAddr string) (addr crypto.Address, memo uint64, asset assets.Asset, offset uint64, limit int64, order bool) {
 	if sAddr != "" {
-		addr, tag, asset = c.parseAddress(sAddr)
+		addr, memo, asset = c.parseAddress(sAddr)
 	}
 	offset = c.getOffset()
 	limit = c.getLimit()
@@ -528,11 +537,11 @@ func (c *Context) parseQueryParams(sAddr string) (addr crypto.Address, tag uint6
 	return
 }
 
-func (c *Context) parseAddress(s string) (addr crypto.Address, tag uint64, asset assets.Asset) {
+func (c *Context) parseAddress(s string) (addr crypto.Address, memo uint64, asset assets.Asset) {
 	if s == "" {
 		s = c.Get("address", "")
 	}
-	addr, tag, err := c.bc.AddressByStr(s)
+	addr, memo, err := c.bc.AddressByStr(s)
 	if err != nil {
 		if strings.HasSuffix(err.Error(), "not found") {
 			c.Panic404(err)
@@ -540,8 +549,8 @@ func (c *Context) parseAddress(s string) (addr crypto.Address, tag uint64, asset
 		c.Panic400Str("incorrect address-params.\nError: " + err.Error())
 	}
 	asset = c.getAsset()
-	if tg := c.getTag(); tg != 0 {
-		tag = tg
+	if m := c.getMemo(); m != 0 {
+		memo = m
 	}
 	return
 }
