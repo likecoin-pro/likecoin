@@ -9,22 +9,22 @@ import (
 )
 
 type AddressInfo struct {
-	Address       string       `json:"address"`     // original address
-	AddressHex    string       `json:"addr_hex"`    //
-	TaggedAddress string       `json:"address_tag"` // address+tag
-	Tag           string       `json:"tag"`         // tag in hex
-	Balance       bignum.Int   `json:"balance"`     // balance on address (not tagged address)
-	Asset         assets.Asset `json:"asset"`       //
-	LastTx        hex.Bytes    `json:"last_tx"`     // last tx of tagged_address
-	User          *object.User `json:"user"`        // user associated with address
+	Address     string       `json:"address"`      // original address
+	AddressHex  string       `json:"addr_hex"`     //
+	MemoAddress string       `json:"address_memo"` // address+memo
+	Memo        string       `json:"memo"`         // memo in hex
+	Balance     bignum.Int   `json:"balance"`      // balance on address (not memo address)
+	Asset       assets.Asset `json:"asset"`        //
+	LastTx      hex.Bytes    `json:"last_tx"`      // last tx of memo address
+	User        *object.User `json:"user"`         // user associated with address
 }
 
-func (s *BlockchainStorage) AddressInfo(addr crypto.Address, tag uint64, asset assets.Asset) (inf AddressInfo, err error) {
-	inf.TaggedAddress = addr.MemoString(tag)
+func (s *BlockchainStorage) AddressInfo(addr crypto.Address, memo uint64, asset assets.Asset) (inf AddressInfo, err error) {
+	inf.MemoAddress = addr.MemoString(memo)
 	inf.Address = addr.String()
 	inf.AddressHex = addr.Hex()
-	if tag != 0 {
-		inf.Tag = "0x" + hex.EncodeUint(tag)
+	if memo != 0 {
+		inf.Memo = "0x" + hex.EncodeUint(memo)
 	}
 	inf.Asset = asset
 	bal, tx, err := s.GetBalance(addr, asset)
@@ -32,8 +32,8 @@ func (s *BlockchainStorage) AddressInfo(addr crypto.Address, tag uint64, asset a
 		return
 	}
 	inf.Balance = bal
-	if tag != 0 {
-		if tx, err = s.LastTx(addr, tag, asset); err != nil {
+	if memo != 0 {
+		if tx, err = s.LastTx(addr, memo, asset); err != nil {
 			return
 		}
 	}
