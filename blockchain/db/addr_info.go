@@ -20,7 +20,7 @@ type AddressInfo struct {
 }
 
 func (s *BlockchainStorage) AddressInfo(addr crypto.Address, tag uint64, asset assets.Asset) (inf AddressInfo, err error) {
-	inf.TaggedAddress = addr.TaggedString(tag)
+	inf.TaggedAddress = addr.MemoString(tag)
 	inf.Address = addr.String()
 	inf.AddressHex = addr.Hex()
 	if tag != 0 {

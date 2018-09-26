@@ -42,7 +42,7 @@ func newAddress(data []byte) (addr Address) {
 }
 
 func (addr Address) String() string {
-	return addr.TaggedString(0)
+	return addr.MemoString(0)
 }
 
 func (addr Address) Empty() bool {
@@ -80,26 +80,26 @@ func (addr *Address) Decode(data []byte) error {
 	return nil
 }
 
-func addrCheckSum(addr []byte, tag uint64) []byte {
+func addrCheckSum(addr []byte, memo uint64) []byte {
 	sha := sha3.NewShake256()
 	sha.Write([]byte(addressPrefix))
 	sha.Write([]byte{addressVer})
 	sha.Write(addr)
-	sha.Write(bin.Uint64ToBytes(tag))
+	sha.Write(bin.Uint64ToBytes(memo))
 	var h [checksumLen]byte
 	sha.Read(h[:])
 	return h[:]
 }
 
-func (addr Address) TaggedString(tag uint64) string {
+func (addr Address) MemoString(memo uint64) string {
 	if addr.Empty() {
 		return ""
 	}
 	w := bin.NewBuffer(nil)
 	w.WriteByte(addressVer) // first byte have to > 0
 	w.Write(addr[:])
-	w.WriteVarUint64(tag)
-	w.Write(addrCheckSum(addr[:], tag))
+	w.WriteVarUint64(memo)
+	w.Write(addrCheckSum(addr[:], memo))
 	return addressPrefix + base58.Encode(w.Bytes())
 }
 
@@ -124,7 +124,7 @@ func (addr *Address) UnmarshalJSON(data []byte) (err error) {
 	return
 }
 
-func ParseAddress(strAddr string) (addr Address, tag uint64, err error) {
+func ParseAddress(strAddr string) (addr Address, memo uint64, err error) {
 	defer func() {
 		if err != nil {
 			addr = NilAddress
@@ -135,7 +135,7 @@ func ParseAddress(strAddr string) (addr Address, tag uint64, err error) {
 	if strings.HasPrefix(strAddr, "0x") {
 		if buf, e := hex.DecodeString(strAddr[2:]); e == nil && (len(buf) == AddressLength || len(buf) == AddressLength+8) {
 			copy(addr[:], buf[:AddressLength])
-			tag = bin.BytesToUint64(buf[AddressLength:])
+			memo = bin.BytesToUint64(buf[AddressLength:])
 		} else {
 			err = errParseAddrInvalid
 		}
@@ -146,7 +146,7 @@ func ParseAddress(strAddr string) (addr Address, tag uint64, err error) {
 		if addr, _, err = ParseAddress(strAddr[:i]); err != nil {
 			return
 		}
-		tag, err = strconv.ParseUint(strAddr[i:], 16, 64)
+		memo, err = strconv.ParseUint(strAddr[i:], 16, 64)
 		return
 	}
 
@@ -167,13 +167,13 @@ func ParseAddress(strAddr string) (addr Address, tag uint64, err error) {
 		err = errParseAddrInvalid
 		return
 	}
-	if tag, err = r.ReadVarUint64(); err != nil {
+	if memo, err = r.ReadVarUint64(); err != nil {
 		err = errParseAddrInvalid
 		return
 	}
 	chSum := make([]byte, checksumLen)
 	_, err = r.Read(chSum[:])
-	if err != nil || !bytes.Equal(chSum, addrCheckSum(addr[:], tag)) {
+	if err != nil || !bytes.Equal(chSum, addrCheckSum(addr[:], memo)) {
 		err = errParseAddrInvalidCheckSum
 		return
 	}
