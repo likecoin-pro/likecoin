@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -20,7 +20,7 @@ func NewClient(apiAddr string) *Client {
 	}
 }
 
-func (c *Client) httpRequest(path string, q url.Values, v interface{}) (err error) {
+func (c *Client) httpRequest(path string, q url.Values, v interface{}, fn func()) (err error) {
 	if q == nil {
 		q = url.Values{}
 	}
@@ -29,25 +29,41 @@ func (c *Client) httpRequest(path string, q url.Values, v interface{}) (err erro
 	sURL := c.apiAddr + path + "?" + q.Encode()
 
 	resp, err := http.Get(sURL)
-	//log.Print("== http request ", sURL)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode == 404 {
 		return
 	}
-
-	data, err := ioutil.ReadAll(resp.Body)
-	//log.Print("== RESP code:", resp.StatusCode, " len:", len(data))
-	if err != nil {
-		return err
+	for r := bin.NewReader(resp.Body); err == nil; {
+		if err = r.ReadVar(v); err == nil {
+			fn()
+		}
 	}
-	err = bin.Decode(data, v)
+	if err == io.EOF {
+		return nil
+	}
 	return
 }
 
+func (c *Client) httpRequestVal(path string, q url.Values, v interface{}) (err error) {
+	return c.httpRequest(path, q, v, func() {})
+}
+
 func (c *Client) GetBlock(num uint64) (block *blockchain.Block, err error) {
-	err = c.httpRequest(fmt.Sprintf("/block/%d", num), nil, &block)
+	err = c.httpRequestVal(fmt.Sprintf("/block/%d", num), nil, &block)
+	return
+}
+
+func (c *Client) GetBlocks(offset uint64, limit int) (blocks []*blockchain.Block, err error) {
+	var block *blockchain.Block
+	err = c.httpRequest("/blocks", url.Values{
+		"offset": {fmt.Sprint(offset)},
+		"limit":  {fmt.Sprint(limit)},
+	}, &block, func() {
+		blocks = append(blocks, block)
+	})
 	return
 }
