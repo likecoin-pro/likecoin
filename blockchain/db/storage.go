@@ -46,13 +46,13 @@ const (
 	dbTabStat      = 0x05 // (ts) => Statistic
 
 	// indexes
-	dbIdxTxID         = 0x20 // (txID)                        => txNum
-	dbIdxAsset        = 0x21 // (asset, txNum)                => sateValue
-	dbIdxAssetAddr    = 0x22 // (asset, addr, txNum)          => sateValue
-	dbIdxAssetAddrTag = 0x23 // (asset, addr, addrTag, txNum) => sateValue
-	dbIdxUsers        = 0x24 // (userID) => txUID
-	dbIdxSourceTx     = 0x25 // (providerID, sourceID, txUID) => nil
-	dbIdxSourceAddr   = 0x26 // (providerID, sourceID, addr)  => total supply by addr
+	dbIdxTxID          = 0x20 // (txID)                        => txNum
+	dbIdxAsset         = 0x21 // (asset, txNum)                => sateValue
+	dbIdxAssetAddr     = 0x22 // (asset, addr, txNum)          => sateValue
+	dbIdxAssetAddrMemo = 0x23 // (asset, addr, addrTag, txNum) => sateValue
+	dbIdxUsers         = 0x24 // (userID) => txUID
+	dbIdxSourceTx      = 0x25 // (providerID, sourceID, txUID) => nil
+	dbIdxSourceAddr    = 0x26 // (providerID, sourceID, addr)  => total supply by addr
 	//dbIdxInvites      = 0x24 // (userID, txNum)               => invitedUserID
 )
 
@@ -262,8 +262,8 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 
 						tr.PutVar(goldb.Key(dbIdxAssetAddr, v.Asset, v.Address, txUID, stIdx), v.Balance)
 
-						if v.Tag != 0 { // change state with tag
-							tr.PutVar(goldb.Key(dbIdxAssetAddrTag, v.Asset, v.Address, v.Tag, txUID, stIdx), v.Balance)
+						if v.Memo != 0 { // change state with memo
+							tr.PutVar(goldb.Key(dbIdxAssetAddrMemo, v.Asset, v.Address, v.Memo, txUID, stIdx), v.Balance)
 						}
 					}
 				}
@@ -527,17 +527,17 @@ func (s *BlockchainStorage) FetchTransactions(
 func (s *BlockchainStorage) FetchTransactionsByAddr(
 	asset assets.Asset,
 	addr crypto.Address,
-	tag uint64,
+	memo uint64,
 	offset uint64,
 	limit int64,
 	orderDesc bool,
 	fn func(tx *blockchain.Transaction, val bignum.Int) error,
 ) error {
 	var q *goldb.Query
-	if tag == 0 { // fetch transactions by address
+	if memo == 0 { // fetch transactions by address
 		q = goldb.NewQuery(dbIdxAssetAddr, asset, addr)
-	} else { // fetch transactions by address+tag
-		q = goldb.NewQuery(dbIdxAssetAddrTag, asset, addr, tag)
+	} else { // fetch transactions by address+memo
+		q = goldb.NewQuery(dbIdxAssetAddrMemo, asset, addr, memo)
 	}
 	if offset > 0 {
 		q.Offset(offset)
@@ -550,11 +550,11 @@ func (s *BlockchainStorage) FetchTransactionsByAddr(
 
 	var txUID uint64
 	return s.db.Fetch(q, func(rec goldb.Record) error {
-		var _tag, _txUID uint64
-		if tag == 0 {
+		var _memo, _txUID uint64
+		if memo == 0 {
 			rec.MustDecodeKey(&asset, &addr, &_txUID)
 		} else {
-			rec.MustDecodeKey(&asset, &addr, &_tag, &_txUID)
+			rec.MustDecodeKey(&asset, &addr, &_memo, &_txUID)
 		}
 		if txUID == _txUID { // exclude multiple records with the same txUID
 			return nil
@@ -573,11 +573,11 @@ func (s *BlockchainStorage) FetchTransactionsByAddr(
 func (s *BlockchainStorage) QueryTransaction(
 	asset assets.Asset,
 	addr crypto.Address,
-	tag uint64,
+	memo uint64,
 	offset uint64,
 	orderDesc bool,
 ) (tx *blockchain.Transaction, val bignum.Int, err error) {
-	err = s.FetchTransactionsByAddr(asset, addr, tag, offset, 1, orderDesc, func(t *blockchain.Transaction, v bignum.Int) error {
+	err = s.FetchTransactionsByAddr(asset, addr, memo, offset, 1, orderDesc, func(t *blockchain.Transaction, v bignum.Int) error {
 		tx, val = t, v
 		return goldb.Break
 	})
@@ -587,12 +587,12 @@ func (s *BlockchainStorage) QueryTransaction(
 func (s *BlockchainStorage) QueryTransactions(
 	asset assets.Asset,
 	addr crypto.Address,
-	tag uint64,
+	memo uint64,
 	offset uint64,
 	limitBlocks int64,
 	orderDesc bool,
 ) (txs []*blockchain.Transaction, err error) {
-	err = s.FetchTransactionsByAddr(asset, addr, tag, offset, limitBlocks, orderDesc, func(tx *blockchain.Transaction, _ bignum.Int) error {
+	err = s.FetchTransactionsByAddr(asset, addr, memo, offset, limitBlocks, orderDesc, func(tx *blockchain.Transaction, _ bignum.Int) error {
 		txs = append(txs, tx)
 		return nil
 	})
@@ -600,7 +600,7 @@ func (s *BlockchainStorage) QueryTransactions(
 }
 
 // AddressByStr returns address by nickname "@nick", "0x<hexUserID>" or by address "LikeXXXXXXXXXXXX"
-func (s *BlockchainStorage) AddressByStr(str string) (addr crypto.Address, tag uint64, err error) {
+func (s *BlockchainStorage) AddressByStr(str string) (addr crypto.Address, memo uint64, err error) {
 	if str == "" {
 		err = ErrAddrNotFound
 		return
@@ -621,7 +621,7 @@ func (s *BlockchainStorage) AddressByStr(str string) (addr crypto.Address, tag u
 			return tx.SenderAddress(), 0, nil
 		}
 	}
-	addr, tag, err = crypto.ParseAddress(str)
+	addr, memo, err = crypto.ParseAddress(str)
 	return
 }
 
@@ -694,8 +694,8 @@ func (s *BlockchainStorage) GetBalance(addr crypto.Address, asset assets.Asset) 
 	return
 }
 
-func (s *BlockchainStorage) LastTx(addr crypto.Address, tag uint64, asset assets.Asset) (lastTx *blockchain.Transaction, err error) {
-	lastTx, _, err = s.QueryTransaction(asset, addr, tag, 0, true)
+func (s *BlockchainStorage) LastTx(addr crypto.Address, memo uint64, asset assets.Asset) (lastTx *blockchain.Transaction, err error) {
+	lastTx, _, err = s.QueryTransaction(asset, addr, memo, 0, true)
 	return
 }
 

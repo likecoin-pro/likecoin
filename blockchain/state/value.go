@@ -13,7 +13,7 @@ type Value struct {
 	Asset   assets.Asset   `json:"asset"`
 	Address crypto.Address `json:"address"`
 	Balance bignum.Int     `json:"balance"`
-	Tag     uint64         `json:"tag"`
+	Memo    uint64         `json:"memo"`
 }
 
 func (v *Value) String() string {
@@ -25,7 +25,7 @@ func (v *Value) Equal(b *Value) bool {
 		v.Asset.Equal(b.Asset) &&
 		v.Address == b.Address &&
 		v.Balance.Equal(b.Balance) &&
-		v.Tag == b.Tag
+		v.Memo == b.Memo
 }
 
 func (v *Value) StateKey() []byte {
@@ -40,7 +40,7 @@ func (v *Value) Hash() []byte {
 		v.ChainID,
 		v.Asset,
 		v.Address,
-		v.Tag,
+		v.Memo,
 		v.Balance,
 	)
 }
@@ -50,7 +50,7 @@ func (v *Value) Encode() []byte {
 		v.ChainID,
 		v.Asset,
 		v.Address,
-		v.Tag,
+		v.Memo,
 		v.Balance,
 	)
 }
@@ -60,7 +60,7 @@ func (v *Value) Decode(data []byte) error {
 		&v.ChainID,
 		&v.Asset,
 		&v.Address,
-		&v.Tag,
+		&v.Memo,
 		&v.Balance,
 	)
 }

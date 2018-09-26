@@ -78,24 +78,24 @@ func (s *State) Apply(vv Values) {
 	}
 }
 
-func (s *State) Set(asset assets.Asset, addr crypto.Address, v bignum.Int, tag uint64) {
-	s.set(&Value{s.chainID, asset, addr, v, tag})
+func (s *State) Set(asset assets.Asset, addr crypto.Address, v bignum.Int, memo uint64) {
+	s.set(&Value{s.chainID, asset, addr, v, memo})
 }
 
-func (s *State) CrossChainSet(chainID uint64, asset assets.Asset, addr crypto.Address, v bignum.Int, tag uint64) {
-	s.set(&Value{chainID, asset, addr, v, tag})
+func (s *State) CrossChainSet(chainID uint64, asset assets.Asset, addr crypto.Address, v bignum.Int, memo uint64) {
+	s.set(&Value{chainID, asset, addr, v, memo})
 }
 
-func (s *State) Increment(asset assets.Asset, addr crypto.Address, delta bignum.Int, tag uint64) {
+func (s *State) Increment(asset assets.Asset, addr crypto.Address, delta bignum.Int, memo uint64) {
 	if delta.IsZero() {
 		return
 	}
 	v := s.Get(asset, addr).Add(delta)
-	s.Set(asset, addr, v, tag)
+	s.Set(asset, addr, v, memo)
 }
 
-func (s *State) Decrement(asset assets.Asset, addr crypto.Address, delta bignum.Int, tag uint64) {
-	s.Increment(asset, addr, delta.Neg(), tag)
+func (s *State) Decrement(asset assets.Asset, addr crypto.Address, delta bignum.Int, memo uint64) {
+	s.Increment(asset, addr, delta.Neg(), memo)
 }
 
 func (s *State) Fail(err error) {

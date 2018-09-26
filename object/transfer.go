@@ -15,12 +15,12 @@ type Transfer struct {
 }
 
 type TransferOut struct {
-	Asset     assets.Asset   `json:"asset"`
-	Amount    bignum.Int     `json:"amount"`
-	Tag       uint64         `json:"tag"`
-	To        crypto.Address `json:"to"`
-	ToTag     uint64         `json:"to_tag"`
-	ToChainID uint64         `json:"to_chain"`
+	Asset     assets.Asset   `json:"asset"`    //
+	Amount    bignum.Int     `json:"amount"`   //
+	Memo      uint64         `json:"tag"`      // sender memo
+	To        crypto.Address `json:"to"`       //
+	ToMemo    uint64         `json:"to_memo"`  //
+	ToChainID uint64         `json:"to_chain"` //
 }
 
 var _ = blockchain.RegisterTxObject(TxTypeTransfer, &Transfer{})
@@ -32,30 +32,30 @@ func NewSimpleTransfer(
 	amount bignum.Int,
 	asset assets.Asset,
 	comment string,
-	tag uint64,
-	toTag uint64,
+	fromMemo uint64,
+	toMemo uint64,
 ) *blockchain.Transaction {
 	tr := &Transfer{
 		Comment: comment,
 	}
-	tr.AddOut(asset, amount, tag, toAddr, toTag, cfg.ChainID)
+	tr.AddOut(asset, amount, fromMemo, toAddr, toMemo, cfg.ChainID)
 	return blockchain.NewTx(cfg, from, 0, tr)
 }
 
 func (obj *Transfer) AddOut(
 	asset assets.Asset,
 	amount bignum.Int,
-	tag uint64,
+	fromMemo uint64,
 	to crypto.Address,
-	toTag uint64,
+	toMemo uint64,
 	toChainID uint64,
 ) {
 	obj.Outs = append(obj.Outs, &TransferOut{
 		Asset:     asset,
 		Amount:    amount,
-		Tag:       tag,
+		Memo:      fromMemo,
 		To:        to,
-		ToTag:     toTag,
+		ToMemo:    toMemo,
 		ToChainID: toChainID,
 	})
 }
@@ -80,9 +80,9 @@ func (out *TransferOut) Encode() []byte {
 	return bin.Encode(
 		out.Asset,
 		out.Amount,
-		out.Tag,
+		out.Memo,
 		out.To,
-		out.ToTag,
+		out.ToMemo,
 		out.ToChainID,
 	)
 }
@@ -91,9 +91,9 @@ func (out *TransferOut) Decode(data []byte) error {
 	return bin.Decode(data,
 		&out.Asset,
 		&out.Amount,
-		&out.Tag,
+		&out.Memo,
 		&out.To,
-		&out.ToTag,
+		&out.ToMemo,
 		&out.ToChainID,
 	)
 }
@@ -124,13 +124,13 @@ func (obj *Transfer) Execute(tx *blockchain.Transaction, st *state.State) {
 	for _, out := range obj.Outs {
 
 		// decrement amount from address; panic if not enough funds
-		st.Decrement(out.Asset, tx.SenderAddress(), out.Amount, out.Tag)
+		st.Decrement(out.Asset, tx.SenderAddress(), out.Amount, out.Memo)
 
 		// increment amount to new address
 		if tx.ChainID == out.ToChainID {
-			st.Increment(out.Asset, out.To, out.Amount, out.ToTag)
+			st.Increment(out.Asset, out.To, out.Amount, out.ToMemo)
 		} else {
-			st.CrossChainSet(out.ToChainID, out.Asset, out.To, out.Amount, out.ToTag)
+			st.CrossChainSet(out.ToChainID, out.Asset, out.To, out.Amount, out.ToMemo)
 		}
 	}
 }
