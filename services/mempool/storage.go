@@ -8,8 +8,8 @@ import (
 )
 
 type Storage struct {
-	mx   sync.RWMutex
-	vals []*blockchain.Transaction
+	mx  sync.RWMutex
+	txs map[uint64]*blockchain.Transaction
 }
 
 type Info struct {
@@ -17,7 +17,9 @@ type Info struct {
 }
 
 func NewStorage() *Storage {
-	return &Storage{}
+	return &Storage{
+		txs: map[uint64]*blockchain.Transaction{},
+	}
 }
 
 func (s *Storage) Info() (i Info) {
@@ -28,14 +30,14 @@ func (s *Storage) Info() (i Info) {
 func (s *Storage) Size() int {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
-	return len(s.vals)
+	return len(s.txs)
 }
 
 // todo: add counters by txType
 func (s *Storage) SizeOf(txType blockchain.TxType) (count int) {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
-	for _, tx := range s.vals {
+	for _, tx := range s.txs {
 		if tx.Type == txType {
 			count++
 		}
@@ -43,35 +45,54 @@ func (s *Storage) SizeOf(txType blockchain.TxType) (count int) {
 	return
 }
 
-func (s *Storage) Put(tx *blockchain.Transaction) error {
+func (s *Storage) Put(tx *blockchain.Transaction) (err error) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
-	s.vals = append(s.vals, tx)
-	return nil
+
+	s.txs[tx.ID()] = tx
+	return
+}
+
+func (s *Storage) PutTxs(txs []*blockchain.Transaction) (err error) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+
+	for _, tx := range txs {
+		s.txs[tx.ID()] = tx
+	}
+	return
 }
 
 func (s *Storage) Pop() (tx *blockchain.Transaction) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
-	if len(s.vals) > 0 {
-		tx = s.vals[0]
-		s.vals = s.vals[1:]
+
+	if len(s.txs) > 0 {
+		for txID, tx := range s.txs {
+			delete(s.txs, txID)
+			return tx
+		}
 	}
 	return
 }
 
 func (s *Storage) PopAll() (txs []*blockchain.Transaction) {
 	s.mx.Lock()
-	defer s.mx.Unlock()
-	txs = s.vals
-	s.vals = nil
+	vv := s.txs
+	s.txs = map[uint64]*blockchain.Transaction{}
+	s.mx.Unlock()
+
+	txs = make([]*blockchain.Transaction, 0, len(vv))
+	for _, tx := range vv {
+		txs = append(txs, tx)
+	}
 	return
 }
 
 func (s *Storage) TxsByAddress(addr crypto.Address) (txs []*blockchain.Transaction, err error) {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
-	for _, tx := range s.vals {
+	for _, tx := range s.txs {
 		if tx.SenderAddress() == addr {
 			txs = append(txs, tx)
 		}
@@ -79,10 +100,22 @@ func (s *Storage) TxsByAddress(addr crypto.Address) (txs []*blockchain.Transacti
 	return
 }
 
-func (s *Storage) TxsAll() (txs []*blockchain.Transaction, err error) {
+func (s *Storage) AllTxs() (txs []*blockchain.Transaction, err error) {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
-	txs = make([]*blockchain.Transaction, len(s.vals))
-	copy(txs, s.vals)
+
+	txs = make([]*blockchain.Transaction, 0, len(s.txs))
+	for _, tx := range s.txs {
+		txs = append(txs, tx)
+	}
+	return
+}
+
+func (s *Storage) RemoveTxs(txIDs []uint64) (err error) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+	for _, txID := range txIDs {
+		delete(s.txs, txID)
+	}
 	return
 }
