@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -16,6 +17,7 @@ import (
 	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/blockchain/db"
 	"github.com/likecoin-pro/likecoin/commons/bignum"
+	"github.com/likecoin-pro/likecoin/commons/enc"
 	hex2 "github.com/likecoin-pro/likecoin/commons/hex"
 	"github.com/likecoin-pro/likecoin/commons/log"
 	"github.com/likecoin-pro/likecoin/crypto"
@@ -99,11 +101,11 @@ func (ctx *Context) Exec() {
 				if e.Code != 404 {
 					log.Error.Printf("HTTP-ERROR-%d: %s", e.Code, e.Err)
 				}
-				http.Error(ctx.rw, e.Err, e.Code)
+				ctx.WriteError(e.Err, e.Code)
 
 			} else if err, ok := r.(error); ok && err != nil {
 				log.Error.Printf("HTTP-ERROR: %v", err)
-				http.Error(ctx.rw, err.Error(), http.StatusInternalServerError)
+				ctx.WriteError(err.Error(), http.StatusInternalServerError)
 			}
 		}
 	}()
@@ -333,6 +335,14 @@ func (c *Context) marshalJSON(v interface{}) (data []byte, err error) {
 		data, err = json.Marshal(v)
 	}
 	return
+}
+
+func (c *Context) WriteError(err string, code int) error {
+	c.rw.Header().Set("Content-Type", "text/json; charset=utf-8")
+	c.rw.Header().Set("X-Content-Type-Options", "nosniff")
+	c.rw.WriteHeader(code)
+	_, e := fmt.Fprintf(c.rw, "{\"code\":%d,\"error\":%s}\n", code, enc.JSON(err))
+	return e
 }
 
 func (c *Context) WriteObject(obj interface{}, ee ...error) {
