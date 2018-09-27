@@ -157,6 +157,7 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 	}
 
 	var blockStat = s.stat
+	var txsIDs []uint64
 
 	// open db transaction
 	err := s.db.Exec(func(tr *goldb.Transaction) {
@@ -174,6 +175,7 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 
 				txID := tx.ID()
 				txUID := encodeTxUID(block.Num, txIdx)
+				txsIDs = append(txsIDs, txID)
 
 				// check transaction by txID
 				if id, _ := tr.GetID(goldb.Key(dbIdxTxID, txID)); id != 0 {
@@ -309,6 +311,9 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 		s.cacheHeaders.Set(block.Num, block.BlockHeader)
 	}
 
+	// remove txs from Mempool
+	s.Mempool.RemoveTxs(txsIDs)
+
 	return nil
 }
 
@@ -437,6 +442,9 @@ func (s *BlockchainStorage) addBlockInfoToTx(tx *blockchain.Transaction, blockNu
 }
 
 func (s *BlockchainStorage) GetTransaction(blockNum uint64, txIdx int) (tx *blockchain.Transaction, err error) {
+	if blockNum == 0 {
+		return
+	}
 	ok, err := s.db.GetVar(goldb.Key(dbTabTxs, blockNum, txIdx), &tx)
 	if err != nil {
 		return nil, err
@@ -449,6 +457,9 @@ func (s *BlockchainStorage) GetTransaction(blockNum uint64, txIdx int) (tx *bloc
 }
 
 func (s *BlockchainStorage) transactionByUID(txUID uint64) (*blockchain.Transaction, error) {
+	if txUID == 0 {
+		return nil, nil
+	}
 	blockNum, txIdx := decodeTxUID(txUID)
 	return s.GetTransaction(blockNum, txIdx)
 }
