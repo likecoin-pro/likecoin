@@ -142,8 +142,14 @@ func (ctx *Context) Exec() {
 			addr, _, _ := ctx.getAddress()
 			ctx.WriteObject(ctx.bc.Mempool.TxsByAddress(addr))
 		} else {
-			ctx.WriteObject(ctx.bc.Mempool.TxsAll())
+			ctx.WriteObject(ctx.bc.Mempool.AllTxs())
 		}
+
+	case path == "/new-txs":
+		var txs []*blockchain.Transaction
+		ctx.parseRequestBody(&txs)
+		err := ctx.bc.Mempool.PutTxs(txs)
+		ctx.WriteObject(len(txs), err)
 
 	case path == "/new-transfer":
 		prv := ctx.getPrvKey()                  // prv OR seed
@@ -267,6 +273,14 @@ var err404 = errors.New("not found")
 type HTTPError struct {
 	Code int
 	Err  string
+}
+
+func (c *Context) parseRequestBody(v interface{}) {
+	r := bin.NewReader(c.req.Body)
+	err := r.ReadVar(v)
+	if err != nil {
+		c.Panic400(err)
+	}
 }
 
 func (c *Context) Panic(code int, err error) {
