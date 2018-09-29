@@ -626,7 +626,7 @@ func (s *BlockchainStorage) AddressByStr(str string) (addr crypto.Address, memo 
 	if len(str) == 18 && str[:2] == "0x" { // address by userID "0x<userID:hex>"
 		if userID, err := strconv.ParseUint(str[2:], 16, 64); err != nil {
 			return crypto.NilAddress, 0, errIncorrectAddress
-		} else if tx, _, err := s.UserByID(userID); err != nil {
+		} else if tx, _, err := s.UserByID(userID); err != nil || tx == nil {
 			return crypto.NilAddress, 0, err
 		} else {
 			return tx.SenderAddress(), 0, nil
@@ -637,7 +637,7 @@ func (s *BlockchainStorage) AddressByStr(str string) (addr crypto.Address, memo 
 }
 
 func (s *BlockchainStorage) UserByID(userID uint64) (tx *blockchain.Transaction, u *object.User, err error) {
-	if tx, err = s.transactionByIdxKey(goldb.Key(dbIdxUsers, userID)); err != nil {
+	if tx, err = s.transactionByIdxKey(goldb.Key(dbIdxUsers, userID)); err != nil || tx == nil {
 		return
 	}
 	obj, err := tx.Object()
