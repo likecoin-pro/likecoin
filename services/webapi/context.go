@@ -338,7 +338,7 @@ func (c *Context) marshalJSON(v interface{}) (data []byte, err error) {
 }
 
 func (c *Context) WriteError(err string, code int) error {
-	c.rw.Header().Set("Content-Type", "text/json; charset=utf-8")
+	c.rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 	c.rw.Header().Set("X-Content-Type-Options", "nosniff")
 	c.rw.WriteHeader(code)
 	_, e := fmt.Fprintf(c.rw, "{\"code\":%d,\"error\":%s}\n", code, enc.JSON(err))
@@ -355,7 +355,7 @@ func (c *Context) WriteObject(obj interface{}, ee ...error) {
 	var err error
 	switch c.Get("encoding", "json") {
 	case "json":
-		c.rw.Header().Set("Content-Type", "text/json; charset=utf-8")
+		c.rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 		data, err = c.marshalJSON(obj)
 
 	case "binary":
@@ -380,7 +380,7 @@ func (c *Context) OpenStream() (s *RWStream) {
 	switch c.Get("encoding", "") {
 	case "json", "":
 		s.encoding = encodingJSON
-		c.rw.Header().Set("Content-Type", "text/json; charset=utf-8")
+		c.rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 		c.rw.WriteHeader(http.StatusOK)
 		_, err = io.Copy(c.rw, bytes.NewBufferString("[\n"))
 	case "binary":
@@ -443,49 +443,6 @@ func (s *RWStream) Close() (err error) {
 	_, err = io.Copy(s.rw, buf)
 	return
 }
-
-/*
-
-	c.rw.Header().Add("Content-Type", "text/json; charset=utf-8")
-	c.rw.WriteHeader(http.StatusOK)
-
-	_, err := c.rw.Write([]byte("["))
-	if err != nil {
-		log.Error.Printf("HTTP-Response-ERROR: %v", err)
-		return
-	}
-
-	first := true
-	err = fn(func(obj interface{}) (err error) {
-
-		data, err := c.marshalJSON(obj)
-		if err != nil {
-			return err
-		}
-
-		buf := bytes.NewBuffer(nil)
-		if first {
-			first = false
-		} else {
-			buf.WriteString(",\n")
-		}
-		buf.Write(data)
-
-		_, err = io.Copy(c.rw, buf)
-		return
-	})
-	if err != nil {
-		log.Error.Printf("HTTP-Response-ERROR: %v", err)
-		return
-	}
-
-	_, err = c.rw.Write([]byte("]"))
-	if err != nil {
-		log.Error.Printf("HTTP-Response-ERROR: %v", err)
-		return
-	}
-}
-*/
 
 //--------------- params -------------------
 func (c *Context) Get(name, defaultVal string) string {
