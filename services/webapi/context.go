@@ -45,15 +45,17 @@ func NewContext(
 	}
 }
 
+const reAddress = `(Like[a-zA-Z0-9]+|@[a-zA-Z][0-9a-zA-Z\-]+)`
+
 var (
-	reBlockNum   = regexp.MustCompile(`^/block/(\d{1,12})$`)             //
-	reBlockTxNum = regexp.MustCompile(`^/block/(\d{1,12})/(\d{1,12})$`)  //
-	reTxID       = regexp.MustCompile(`^/tx/([a-f0-9]{1,16})$`)          //
-	reTxHash     = regexp.MustCompile(`^/tx/([a-f0-9]{64})$`)            //
-	reAddrInfo   = regexp.MustCompile(`^/address/(@?[0-9a-zA-Z]+)$`)     //
-	reUserInfo   = regexp.MustCompile(`^/user/(@?[0-9a-zA-Z]+)$`)        //
-	reTxsAddr    = regexp.MustCompile(`^/txs/(@?[0-9a-zA-Z]+)$`)         //
-	reAddrTxs    = regexp.MustCompile(`^/address/(@?[0-9a-zA-Z]+)/txs$`) //
+	reBlockNum   = regexp.MustCompile(`^/block/(\d{1,12})$`)              //
+	reBlockTxNum = regexp.MustCompile(`^/block/(\d{1,12})/(\d{1,12})$`)   //
+	reTxID       = regexp.MustCompile(`^/tx/([a-f0-9]{1,16})$`)           //
+	reTxHash     = regexp.MustCompile(`^/tx/([a-f0-9]{64})$`)             //
+	reAddrInfo   = regexp.MustCompile(`^/address/` + reAddress + `$`)     //
+	reUserInfo   = regexp.MustCompile(`^/user/` + reAddress + `$`)        //
+	reTxsAddr    = regexp.MustCompile(`^/txs/` + reAddress + `$`)         //
+	reAddrTxs    = regexp.MustCompile(`^/address/` + reAddress + `/txs$`) //
 )
 
 /**
