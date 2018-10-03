@@ -53,7 +53,7 @@ const (
 	dbIdxUsers         = 0x24 // (userID) => txUID
 	dbIdxSourceTx      = 0x25 // (providerID, sourceID, txUID) => nil
 	dbIdxSourceAddr    = 0x26 // (providerID, sourceID, addr)  => total supply by addr
-	//dbIdxInvites      = 0x24 // (userID, txNum)               => invitedUserID
+	dbIdxInvites       = 0x27 // (userID, txNum)               => invitedUserID
 )
 
 var (
@@ -209,11 +209,11 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 					}
 				}
 
-				// handle user registration
+				obj := tx.TxObject()
+
 				switch tx.Type {
 
 				case object.TxTypeEmission:
-					obj, _ := tx.Object()
 					if emission, ok := obj.(*object.Emission); ok {
 						for _, out := range emission.Outs {
 							// set last tx by source
@@ -230,7 +230,6 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 					}
 
 				case object.TxTypeTransfer:
-					obj, _ := tx.Object()
 					if tr, ok := obj.(*object.Transfer); ok {
 						blockStat.IncVolumeStat(tr) // refresh statistic of total transfers
 					}
@@ -243,6 +242,10 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 						tr.Fail(errUserHasBeenRegistered)
 					}
 					tr.PutID(goldb.Key(dbIdxUsers, userID), txUID)
+
+					if usr, ok := obj.(*object.User); ok && usr.ReferrerID != 0 {
+						tr.PutID(goldb.Key(dbIdxInvites, usr.ReferrerID, txUID), txUID)
+					}
 
 					blockStat.Users++ // increment users counter
 				}
@@ -460,8 +463,7 @@ func (s *BlockchainStorage) transactionByUID(txUID uint64) (*blockchain.Transact
 	if txUID == 0 {
 		return nil, nil
 	}
-	blockNum, txIdx := decodeTxUID(txUID)
-	return s.GetTransaction(blockNum, txIdx)
+	return s.GetTransaction(decodeTxUID(txUID))
 }
 
 func (s *BlockchainStorage) BlockTxs(blockNum uint64) (txs []*blockchain.Transaction, err error) {
@@ -506,6 +508,18 @@ func (s *BlockchainStorage) transactionByIdxKey(idxKey []byte) (*blockchain.Tran
 	} else {
 		return s.transactionByUID(txUID)
 	}
+}
+
+func (s *BlockchainStorage) fetchTransactionsByIndex(q *goldb.Query, fn func(tx *blockchain.Transaction) error) error {
+	return s.db.Fetch(q, func(rec goldb.Record) (err error) {
+		var txUID uint64
+		rec.MustDecode(&txUID)
+		tx, err := s.transactionByUID(txUID)
+		if tx != nil && err == nil {
+			return fn(tx)
+		}
+		return
+	})
 }
 
 func (s *BlockchainStorage) FetchTransactions(
@@ -674,6 +688,34 @@ func (s *BlockchainStorage) UserByNick(name string) (tx *blockchain.Transaction,
 		return
 	}
 	return s.UserByID(addr.ID())
+}
+
+func (s *BlockchainStorage) FetchInvitedUsers(
+	userID uint64,
+	offset uint64,
+	limit int64,
+	orderDesc bool,
+	fn func(tx *blockchain.Transaction, u *object.User) error,
+) error {
+	q := goldb.NewQuery(dbIdxInvites, userID)
+	if offset > 0 {
+		q.Offset(offset)
+	}
+	q.Order(orderDesc).Limit(limit)
+	return s.fetchTransactionsByIndex(q, func(tx *blockchain.Transaction) error {
+		if user, ok := tx.TxObject().(*object.User); ok && user != nil {
+			return fn(tx, user)
+		}
+		return nil
+	})
+}
+
+func (s *BlockchainStorage) QueryInvitedUsers(userID, offset uint64, limit int64) (users []*object.User, err error) {
+	err = s.FetchInvitedUsers(userID, offset, limit, false, func(tx *blockchain.Transaction, u *object.User) error {
+		users = append(users, u)
+		return nil
+	})
+	return
 }
 
 func (s *BlockchainStorage) LastAssetTx(asset assets.Asset) (addr crypto.Address, txUID uint64, val bignum.Int, err error) {
