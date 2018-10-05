@@ -23,6 +23,7 @@ type BCContext interface {
 	State() *state.State
 	StateTree() *patricia.Tree
 	ChainTree() *patricia.Tree
+	TransactionByID(txID uint64) (*Transaction, error)
 }
 
 // todo: StateTree() move to *State
@@ -49,6 +50,11 @@ func GenerateNewBlockEx(
 	st := bc.State()
 	validTxs := txs[:0]
 	for _, tx := range txs {
+		if tx, err := bc.TransactionByID(tx.ID()); err != nil {
+			return nil, err
+		} else if tx != nil {
+			continue // skip
+		}
 		if upd, err := tx.Execute(st); err == nil {
 			tx.StateUpdates = upd
 			st.Apply(upd)
