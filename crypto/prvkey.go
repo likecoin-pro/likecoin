@@ -33,8 +33,8 @@ func NewPrivateKey() *PrivateKey {
 	return newPrvKey(randInt())
 }
 
-func NewPrivateKeyBySecret(secret string) *PrivateKey {
-	key := xhash.GenerateKeyByPassword(secret, KeySize*8)
+func NewPrivateKeyBySecret(seed string) *PrivateKey {
+	key := xhash.GenerateKeyByPassword(seed, KeySize*8)
 	return newPrvKey(normInt(key))
 }
 
