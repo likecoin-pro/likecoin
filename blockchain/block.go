@@ -24,6 +24,7 @@ type BCContext interface {
 	StateTree() *patricia.Tree
 	ChainTree() *patricia.Tree
 	TransactionByID(txID uint64) (*Transaction, error)
+	UsernameByID(userID uint64) (nick string, err error)
 }
 
 // todo: StateTree() move to *State
@@ -107,8 +108,8 @@ func GenerateNewBlockEx(
 }
 
 // Size returns block-header size + txs size
-func (b *Block) Size() int {
-	return len(b.Encode())
+func (b *Block) Size() int64 {
+	return int64(len(b.Encode()))
 }
 
 func (b *Block) CountTxs() int {
