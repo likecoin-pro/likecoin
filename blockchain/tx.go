@@ -35,10 +35,11 @@ type Transaction struct {
 	StateUpdates state.Values // state changes (is not filled by sender)
 
 	// not imported fields
-	blockNum uint64   //
-	blockIdx int      //
-	blockTs  int64    //
-	_obj     TxObject //
+	blockNum uint64    //
+	blockIdx int       //
+	blockTs  int64     //
+	_obj     TxObject  //
+	bc       BCContext //
 }
 
 func NewTx(cfg *Config, sender *crypto.PrivateKey, nonce uint64, obj TxObject) *Transaction {
@@ -54,6 +55,7 @@ func NewTx(cfg *Config, sender *crypto.PrivateKey, nonce uint64, obj TxObject) *
 		Nonce:   nonce,             //
 		Data:    obj.Encode(),      // encoded tx-object
 	}
+	obj.SetContext(tx)
 	tx.Sig = sender.Sign(tx.Hash())
 	return tx
 }
@@ -83,7 +85,17 @@ func (tx *Transaction) StrID() string {
 }
 
 func (tx *Transaction) SenderAddress() crypto.Address {
-	return tx.Sender.Address()
+	if tx != nil && tx.Sender != nil {
+		return tx.Sender.Address()
+	}
+	return crypto.NilAddress
+}
+
+func (tx *Transaction) SenderNick() (nick string, err error) {
+	if tx != nil && tx.bc != nil && tx.Sender != nil {
+		nick, err = tx.bc.UsernameByID(tx.Sender.Address().ID())
+	}
+	return
 }
 
 // Hash returns hash of senders data
@@ -122,8 +134,15 @@ func (tx *Transaction) TxObject() TxObject {
 	return obj
 }
 
-func (tx *Transaction) SetBlockInfo(blockNum uint64, blockTxIdx int, blockTs int64) {
-	tx.blockNum, tx.blockIdx, tx.blockTs = blockNum, blockTxIdx, blockTs
+func (tx *Transaction) SetBlockInfo(bc BCContext, blockNum uint64, blockTxIdx int, blockTs int64) {
+	tx.bc, tx.blockNum, tx.blockIdx, tx.blockTs = bc, blockNum, blockTxIdx, blockTs
+}
+
+func (tx *Transaction) BCContext() BCContext {
+	if tx != nil {
+		return tx.bc
+	}
+	return nil
 }
 
 func (tx *Transaction) BlockNum() uint64 {
@@ -185,6 +204,7 @@ func (tx *Transaction) Object() (obj TxObject, err error) {
 	if err != nil {
 		return
 	}
+	obj.SetContext(tx)
 	if err = obj.Decode(tx.Data); err != nil {
 		return
 	}
@@ -219,7 +239,7 @@ func (tx *Transaction) Verify(cfg *Config) error {
 	if err != nil {
 		return err
 	}
-	if err := txObj.Verify(tx); err != nil {
+	if err := txObj.Verify(); err != nil {
 		return err
 	}
 
@@ -245,7 +265,7 @@ func (tx *Transaction) Execute(s *state.State) (updates state.Values, err error)
 
 	newState := s.NewSubState()
 
-	obj.Execute(tx, newState)
+	obj.Execute(newState)
 
 	updates = newState.Values()
 
