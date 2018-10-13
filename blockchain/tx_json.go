@@ -21,7 +21,8 @@ type transactionJSON struct {
 	ChainID      uint64            `json:"chain"`          //
 	Nonce        uint64            `json:"nonce"`          //
 	Sender       *crypto.PublicKey `json:"sender"`         // tx sender
-	SenderAddr   crypto.Address    `json:"sender_address"` //
+	SenderAddr   crypto.Address    `json:"sender_address"` // tx sender address
+	SenderNick   string            `json:"sender_nick"`    // tx sender nickname (can be empty)
 	ObjRaw       hex.Bytes         `json:"data"`           // encoded tx-data
 	Obj          TxObject          `json:"obj"`            // unserialized data
 	Sig          hex.Bytes         `json:"sig"`            //
@@ -33,6 +34,7 @@ func (tx *Transaction) MarshalJSON() ([]byte, error) {
 		return json.Marshal(nil)
 	}
 	obj, _ := tx.Object()
+	nick, _ := tx.SenderNick()
 	return json.Marshal(&transactionJSON{
 		Type:         tx.Type,
 		Version:      tx.Version,
@@ -41,6 +43,7 @@ func (tx *Transaction) MarshalJSON() ([]byte, error) {
 		Nonce:        tx.Nonce,
 		Sender:       tx.Sender,
 		SenderAddr:   tx.SenderAddress(),
+		SenderNick:   nick,
 		ObjRaw:       tx.Data,
 		Obj:          obj,
 		TxID:         hex.Uint64(tx.ID()),
