@@ -54,6 +54,7 @@ const (
 	dbIdxSourceTx      = 0x25 // (providerID, sourceID, txUID) => nil
 	dbIdxSourceAddr    = 0x26 // (providerID, sourceID, addr)  => total supply by addr
 	dbIdxInvites       = 0x27 // (userID, txNum)               => invitedUserID
+	dbIdxSrcInvites    = 0x28 // (userID, txNum)               => invitedUserID
 )
 
 var (
@@ -109,6 +110,10 @@ func (s *BlockchainStorage) Drop() (err error) {
 
 func (s *BlockchainStorage) VacuumDB() error {
 	return s.db.Vacuum()
+}
+
+func (s *BlockchainStorage) DBStorage() *goldb.Storage {
+	return s.db
 }
 
 func (s *BlockchainStorage) AddMiddleware(fn Middleware) {
@@ -215,16 +220,25 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 
 				case object.TxTypeEmission:
 					if emission, ok := obj.(*object.Emission); ok {
-						for _, out := range emission.Outs {
-							// set last tx by source
-							tr.Put(goldb.Key(dbIdxSourceTx, emission.Asset, out.SourceID, txUID), nil)
+						if emission.IsPrimaryEmission() {
+							for _, out := range emission.Outs {
+								// set last tx by source
+								tr.Put(goldb.Key(dbIdxSourceTx, emission.Asset, out.SourceID, txUID), nil)
 
-							// increment last tx by source
-							var srcAddrTotal bignum.Int
-							tr.GetVar(goldb.Key(dbIdxSourceAddr, emission.Asset, out.SourceID, out.Address), &srcAddrTotal)
-							srcAddrTotal = srcAddrTotal.Add(emission.Amount(out.Delta))
-							tr.PutVar(goldb.Key(dbIdxSourceAddr, emission.Asset, out.SourceID, out.Address), srcAddrTotal)
+								// increment last tx by source
+								if out.Delta > 0 {
+									delta := emission.Amount(out.Delta)
+									tr.IncrementBig(goldb.Key(dbIdxSourceAddr, emission.Asset, out.SourceID, out.Address), delta.BigInt())
+								}
+							}
 						}
+						// else if emission.IsReferralReward() {
+						//	for _, out := range emission.Outs {
+						//		if out.Delta > 0 {
+						//			delta := emission.Amount(out.Delta)
+						//			tr.IncrementBig(goldb.Key(dbIdxSrcInvites, emission.Asset, out.SourceID, out.Address), delta.BigInt())
+						//		}
+						//	}
 
 						blockStat.IncSupplyStat(emission) // refresh totals statistic
 					}
@@ -381,6 +395,14 @@ func (s *BlockchainStorage) GetBlock(num uint64) (block *blockchain.Block, err e
 	return blockchain.NewBlock(h, txs), nil
 }
 
+func (s *BlockchainStorage) GetBlocks(offset uint64, limit int64, desc bool) (blocks []*blockchain.Block, err error) {
+	err = s.FetchBlocks(offset, limit, desc, func(block *blockchain.Block) error {
+		blocks = append(blocks, block)
+		return nil
+	})
+	return
+}
+
 func (s *BlockchainStorage) BlockHeader(num uint64) (h *blockchain.BlockHeader, err error) {
 	if num == 0 {
 		return blockchain.GenesisBlockHeader(s.Cfg), nil
@@ -439,7 +461,7 @@ func decodeTxUID(txUID uint64) (blockNum uint64, txIdx int) {
 func (s *BlockchainStorage) addBlockInfoToTx(tx *blockchain.Transaction, blockNum uint64, txIdx int) (err error) {
 	block, err := s.BlockHeader(blockNum)
 	if err == nil {
-		tx.SetBlockInfo(blockNum, txIdx, block.Timestamp)
+		tx.SetBlockInfo(s, blockNum, txIdx, block.Timestamp)
 	}
 	return
 }
@@ -570,11 +592,13 @@ func (s *BlockchainStorage) FetchTransactionsByAddr(
 	if limit <= 0 {
 		limit = 1000
 	}
-	q.Limit(limit)
 	q.Order(orderDesc)
 
 	var txUID uint64
 	return s.db.Fetch(q, func(rec goldb.Record) error {
+		if limit <= 0 {
+			return goldb.Break
+		}
 		var _memo, _txUID uint64
 		if memo == 0 {
 			rec.MustDecodeKey(&asset, &addr, &_txUID)
@@ -591,6 +615,7 @@ func (s *BlockchainStorage) FetchTransactionsByAddr(
 		}
 		var v bignum.Int
 		rec.MustDecode(&v)
+		limit--
 		return fn(tx, v)
 	})
 }
@@ -650,7 +675,20 @@ func (s *BlockchainStorage) AddressByStr(str string) (addr crypto.Address, memo 
 	return
 }
 
+func (s *BlockchainStorage) UsernameByID(userID uint64) (nick string, err error) {
+	// todo: use cache
+
+	_, u, err := s.UserByID(userID)
+	if u != nil {
+		nick = u.Nick
+	}
+	return
+}
+
 func (s *BlockchainStorage) UserByID(userID uint64) (tx *blockchain.Transaction, u *object.User, err error) {
+	if userID == 0 {
+		return
+	}
 	if tx, err = s.transactionByIdxKey(goldb.Key(dbIdxUsers, userID)); err != nil || tx == nil {
 		return
 	}
@@ -659,7 +697,7 @@ func (s *BlockchainStorage) UserByID(userID uint64) (tx *blockchain.Transaction,
 		return
 	}
 	u, ok := obj.(*object.User)
-	if !ok {
+	if !ok || u == nil {
 		err = errUserNotFound
 	}
 	return
