@@ -13,6 +13,7 @@ import (
 )
 
 type Emission struct {
+	Object
 	Asset   assets.Asset   `json:"asset"`   // coin
 	Rate    bignum.Int     `json:"rate"`    // current like rate (in coins)
 	Comment string         `json:"comment"` //
@@ -27,6 +28,8 @@ type EmissionOut struct {
 }
 
 var _ = blockchain.RegisterTxObject(TxTypeEmission, &Emission{})
+
+const ReferralRewardTxComment = "referral_reward"
 
 var (
 	ErrEmissionTxEmptyAddr      = errors.New("emission-tx: empty address")
@@ -93,6 +96,14 @@ func (obj *Emission) Amount(delta int64) bignum.Int {
 	return bignum.NewInt(delta).Mul(obj.Rate)
 }
 
+func (obj *Emission) IsPrimaryEmission() bool {
+	return !obj.IsReferralReward()
+}
+
+func (obj *Emission) IsReferralReward() bool {
+	return obj.Comment == ReferralRewardTxComment
+}
+
 func (obj *Emission) TotalDelta() (likes int64) {
 	for _, out := range obj.Outs {
 		likes += out.Delta
@@ -113,9 +124,9 @@ func (obj *Emission) OutBySrc(srcID string) *EmissionOut {
 	return nil
 }
 
-func (obj *Emission) Verify(tx *blockchain.Transaction) error {
+func (obj *Emission) Verify() error {
 
-	if !tx.Sender.Equal(config.EmissionPublicKey) { // Sender of emission-tx must be EmissionPublicKey
+	if !obj.Sender().Equal(config.EmissionPublicKey) { // Sender of emission-tx must be EmissionPublicKey
 		return ErrTxIncorrectSender
 	}
 	if obj.Rate.Sign() < 0 {
@@ -136,7 +147,7 @@ func (obj *Emission) Verify(tx *blockchain.Transaction) error {
 	return nil
 }
 
-func (obj *Emission) Execute(tx *blockchain.Transaction, st *state.State) {
+func (obj *Emission) Execute(st *state.State) {
 
 	coin := obj.Asset
 
