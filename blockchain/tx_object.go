@@ -10,8 +10,9 @@ import (
 type TxObject interface {
 	Encode() []byte
 	Decode([]byte) error
-	Verify(*Transaction) error
-	Execute(*Transaction, *state.State)
+	SetContext(*Transaction)
+	Verify() error
+	Execute(*state.State)
 }
 
 var (
