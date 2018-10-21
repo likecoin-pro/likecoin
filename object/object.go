@@ -1,6 +1,11 @@
 package object
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/likecoin-pro/likecoin/blockchain"
+	"github.com/likecoin-pro/likecoin/crypto"
+)
 
 const (
 	TxTypeEmission = 0
@@ -16,3 +21,28 @@ var (
 
 	ErrInvalidUserID = errors.New("invalid userID")
 )
+
+type Object struct {
+	tx *blockchain.Transaction `json:"-"`
+}
+
+func (obj *Object) Sender() *crypto.PublicKey {
+	if obj.tx != nil {
+		return obj.tx.Sender
+	}
+	return nil
+}
+func (obj *Object) SenderAddress() crypto.Address {
+	if obj.tx != nil {
+		return obj.tx.SenderAddress()
+	}
+	return crypto.NilAddress
+}
+
+func (obj *Object) Tx() *blockchain.Transaction {
+	return obj.tx
+}
+
+func (obj *Object) SetContext(tx *blockchain.Transaction) {
+	obj.tx = tx
+}
