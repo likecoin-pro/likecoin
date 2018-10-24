@@ -17,6 +17,7 @@ import (
 )
 
 type User struct {
+	Object
 	Nick       string     `json:"nick"`
 	ReferrerID hex.Uint64 `json:"referrer"`
 	Data       []byte     `json:"data"`
@@ -67,7 +68,7 @@ var (
 	errUserDataIsTooLong = errors.New("tx-user-verify: data is too long")
 )
 
-func (obj *User) Verify(tx *blockchain.Transaction) error {
+func (obj *User) Verify() error {
 	if !reNick.MatchString(obj.Nick) {
 		return errInvalidNickname
 	}
@@ -77,9 +78,9 @@ func (obj *User) Verify(tx *blockchain.Transaction) error {
 	return nil
 }
 
-func (obj *User) Execute(tx *blockchain.Transaction, st *state.State) {
+func (obj *User) Execute(st *state.State) {
 	nameAsset := assets.NewName(obj.Nick)
-	userAddr := tx.SenderAddress()
+	userAddr := obj.SenderAddress()
 
 	// set username as asset to user-address
 	st.Set(nameAsset, userAddr, bignum.NewInt(1), 0)
