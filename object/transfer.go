@@ -1,6 +1,8 @@
 package object
 
 import (
+	"encoding/json"
+
 	"github.com/denisskin/bin"
 	"github.com/likecoin-pro/likecoin/assets"
 	"github.com/likecoin-pro/likecoin/blockchain"
@@ -10,6 +12,7 @@ import (
 )
 
 type Transfer struct {
+	Object
 	Outs    []*TransferOut `json:"outs"`
 	Comment string         `json:"comment"`
 }
@@ -17,7 +20,7 @@ type Transfer struct {
 type TransferOut struct {
 	Asset     assets.Asset   `json:"asset"`    //
 	Amount    bignum.Int     `json:"amount"`   //
-	Memo      uint64         `json:"tag"`      // sender memo
+	Tag       uint64         `json:"tag"`      // sender memo
 	To        crypto.Address `json:"to"`       //
 	ToMemo    uint64         `json:"to_memo"`  //
 	ToChainID uint64         `json:"to_chain"` //
@@ -32,20 +35,20 @@ func NewSimpleTransfer(
 	amount bignum.Int,
 	asset assets.Asset,
 	comment string,
-	fromMemo uint64,
+	tag uint64, // sender tag
 	toMemo uint64,
 ) *blockchain.Transaction {
 	tr := &Transfer{
 		Comment: comment,
 	}
-	tr.AddOut(asset, amount, fromMemo, toAddr, toMemo, cfg.ChainID)
+	tr.AddOut(asset, amount, tag, toAddr, toMemo, cfg.ChainID)
 	return blockchain.NewTx(cfg, from, 0, tr)
 }
 
 func (obj *Transfer) AddOut(
 	asset assets.Asset,
 	amount bignum.Int,
-	fromMemo uint64,
+	tag uint64,
 	to crypto.Address,
 	toMemo uint64,
 	toChainID uint64,
@@ -53,7 +56,7 @@ func (obj *Transfer) AddOut(
 	obj.Outs = append(obj.Outs, &TransferOut{
 		Asset:     asset,
 		Amount:    amount,
-		Memo:      fromMemo,
+		Tag:       tag,
 		To:        to,
 		ToMemo:    toMemo,
 		ToChainID: toChainID,
@@ -80,7 +83,7 @@ func (out *TransferOut) Encode() []byte {
 	return bin.Encode(
 		out.Asset,
 		out.Amount,
-		out.Memo,
+		out.Tag,
 		out.To,
 		out.ToMemo,
 		out.ToChainID,
@@ -91,7 +94,7 @@ func (out *TransferOut) Decode(data []byte) error {
 	return bin.Decode(data,
 		&out.Asset,
 		&out.Amount,
-		&out.Memo,
+		&out.Tag,
 		&out.To,
 		&out.ToMemo,
 		&out.ToChainID,
@@ -107,8 +110,8 @@ func (obj *Transfer) Totals() map[string]bignum.Int {
 	return vv
 }
 
-func (obj *Transfer) Verify(tx *blockchain.Transaction) error {
-	sender := tx.SenderAddress()
+func (obj *Transfer) Verify() error {
+	sender := obj.SenderAddress()
 	for _, out := range obj.Outs {
 		if out.To.Empty() || out.To.Equal(sender) {
 			return ErrTxIncorrectOutAddress
@@ -120,11 +123,13 @@ func (obj *Transfer) Verify(tx *blockchain.Transaction) error {
 	return nil
 }
 
-func (obj *Transfer) Execute(tx *blockchain.Transaction, st *state.State) {
+func (obj *Transfer) Execute(st *state.State) {
+	tx := obj.Tx()
+	senderAddr := obj.SenderAddress()
 	for _, out := range obj.Outs {
 
 		// decrement amount from address; panic if not enough funds
-		st.Decrement(out.Asset, tx.SenderAddress(), out.Amount, out.Memo)
+		st.Decrement(out.Asset, senderAddr, out.Amount, out.Tag)
 
 		// increment amount to new address
 		if tx.ChainID == out.ToChainID {
@@ -133,4 +138,46 @@ func (obj *Transfer) Execute(tx *blockchain.Transaction, st *state.State) {
 			st.CrossChainSet(out.ToChainID, out.Asset, out.To, out.Amount, out.ToMemo)
 		}
 	}
+}
+
+//--------------------- JSON -----------------------------
+type TransferJSON struct {
+	Outs    []*TransferOutJSON `json:"outs"`
+	Comment string             `json:"comment"`
+}
+
+type TransferOutJSON struct {
+	Asset      string     `json:"asset"`           //
+	Amount     bignum.Int `json:"amount"`          //
+	Tag        uint64     `json:"tag"`             // sender memo
+	To         string     `json:"to"`              //
+	ToMemo     uint64     `json:"to_memo"`         //
+	ToMemoAddr string     `json:"to_memo_address"` //
+	ToNick     string     `json:"to_nick"`         //
+	ToChainID  uint64     `json:"to_chain"`        //
+}
+
+func (obj *Transfer) MarshalJSON() ([]byte, error) {
+	t := &TransferJSON{
+		Comment: obj.Comment,
+		Outs:    make([]*TransferOutJSON, 0, len(obj.Outs)),
+	}
+	bc := obj.Tx().BCContext()
+	for _, out := range obj.Outs {
+		var nick string
+		if bc != nil {
+			nick, _ = bc.UsernameByID(out.To.ID())
+		}
+		t.Outs = append(t.Outs, &TransferOutJSON{
+			Asset:      out.Asset.String(),
+			Amount:     out.Amount,
+			Tag:        out.Tag,
+			To:         out.To.String(),
+			ToMemo:     out.ToMemo,
+			ToMemoAddr: out.To.MemoString(out.ToMemo),
+			ToNick:     nick,
+			ToChainID:  out.ToChainID,
+		})
+	}
+	return json.Marshal(t)
 }
