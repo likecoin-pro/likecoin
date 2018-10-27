@@ -102,8 +102,10 @@ func (s *Statistic) setCoinStat(v CoinStatistic) {
 
 func (s *Statistic) IncSupplyStat(emission *object.Emission) {
 	c := s.CoinStat(emission.Asset)
-	c.Rate = emission.Rate
-	c.Likes += emission.TotalDelta()
+	if emission.IsPrimaryEmission() {
+		c.Rate = emission.Rate
+		c.Likes += emission.TotalDelta()
+	}
 	c.Supply = c.Supply.Add(emission.TotalAmount())
 	s.setCoinStat(c)
 }
