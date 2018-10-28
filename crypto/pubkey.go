@@ -40,6 +40,9 @@ func (pub *PublicKey) Equal(p *PublicKey) bool {
 }
 
 func (pub *PublicKey) Address() Address {
+	if pub == nil {
+		return NilAddress
+	}
 
 	// address := last 24 bytes of SHAKE512(SHAKE512(x||y))
 	buf := make([]byte, 64)
