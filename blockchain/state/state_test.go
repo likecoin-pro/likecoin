@@ -155,18 +155,18 @@ func TestValue_MarshalJSON(t *testing.T) {
 	assert.NoError(t, err)
 	assert.JSONEq(t, `[
 	  {
-		"chain": 0,
+		"chain":   0,
 		"address": "Like5QU4UiVeh7459hiRPJZfh9AhoFN29Pn9bwwSGvJ",
 		"asset":   "0x0001",
-		"balance":   1,
-		"tag":   111
+		"balance": 1,
+		"memo":    111
 	  },
 	  {
-		"chain": 0,
+		"chain":   0,
 		"address": "Like3mJ34d7obc37tS1Rx4aqtZdPew3n61xwTeWV9Am",
 		"asset":   "0x0001",
-		"balance":   100,
-		"tag":   222
+		"balance": 100,
+		"memo":    222
 	  }
 	]`, string(data))
 }
@@ -187,32 +187,32 @@ func TestState_Values(t *testing.T) {
 	assert.NoError(t, err)
 	assert.JSONEq(t, `[
 	  {
-		"chain": 0,
-		"asset": "0x0001",
+		"chain":   0,
+		"asset":   "0x0001",
 		"address": "Like5QU4UiVeh7459hiRPJZfh9AhoFN29Pn9bwwSGvJ",
 		"balance": 1,
-		"tag": 111
+		"memo":    111
 	  },
 	  {
-		"chain": 0,
-		"asset": "0x0001",
+		"chain":   0,
+		"asset":   "0x0001",
 		"address": "Like3mJ34d7obc37tS1Rx4aqtZdPew3n61xwTeWV9Am",
 		"balance": 3,
-		"tag": 222
+		"memo":    222
 	  },
 	  {
-		"chain": 0,
-		"asset": "0x0001",
+		"chain":   0,
+		"asset":   "0x0001",
 		"address": "Like3mJ34d7obc37tS1Rx4aqtZdPew3n61xwTeWV9Am",
 		"balance": 0,
-		"tag": 333
+		"memo":    333
 	  },
 	  {
-		"chain": 0,
-		"asset": "0x0001",
+		"chain":   0,
+		"asset":   "0x0001",
 		"address": "Like5QU4UiVeh7459hiRPJZfh9AhoFN29Pn9bwwSGvJ",
 		"balance": 4,
-		"tag": 333
+		"memo":    333
 	  }
 	]`, enc.JSON(values))
 }
