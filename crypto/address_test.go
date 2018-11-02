@@ -35,54 +35,63 @@ func TestAddress_IsNil(t *testing.T) {
 	assert.True(t, isNil)
 }
 
-func TestAddress_TaggedString(t *testing.T) {
+func TestAddress_MemoString(t *testing.T) {
 	addr := newAddress(randBytes(AddressLength))
 
-	sAddr := addr.TaggedString(666)
+	sAddr := addr.MemoString(666)
 
 	assert.True(t, strings.HasPrefix(sAddr, "Like"))
 	assert.True(t, len(sAddr) > 43)
+}
+
+func TestAddress_MemoString_maxLength(t *testing.T) {
+	addr := newAddress(randBytes(AddressLength))
+
+	sAddr := addr.MemoString(uint64(0x7fffffffffffffff))
+
+	assert.True(t, strings.HasPrefix(sAddr, "Like"))
+	assert.Equal(t, 54, len(sAddr))
 }
 
 func TestParseAddress(t *testing.T) {
 	randData := randBytes(AddressLength)
 	strAddr := newAddress(randData).String()
 
-	addr, tag, err := ParseAddress(strAddr)
+	addr, memo, err := ParseAddress(strAddr)
 
 	assert.NoError(t, err)
 	assert.Equal(t, randData, addr[:])
-	assert.EqualValues(t, 0, tag)
+	assert.EqualValues(t, 0, memo)
 }
 
-func TestParseAddress_withTag(t *testing.T) {
-	strAddr := newAddress(randBytes(AddressLength)).TaggedString(0x19720000abba0000)
+func TestParseAddress_withMemo(t *testing.T) {
+	strAddr := newAddress(randBytes(AddressLength)).MemoString(0x19720000abba0000)
 
-	_, tag, err := ParseAddress(strAddr)
+	_, memo, err := ParseAddress(strAddr)
 
 	assert.NoError(t, err)
-	assert.EqualValues(t, 0x19720000abba0000, tag)
+	assert.EqualValues(t, 0x19720000abba0000, memo)
 }
 
-func TestParseAddress_withTag2(t *testing.T) {
+func TestParseAddress_withMemo2(t *testing.T) {
 	for i := uint64(1); i < 1e3; i++ {
-		strAddr := newAddress(randBytes(AddressLength)).TaggedString(i)
+		strAddr := newAddress(randBytes(AddressLength)).MemoString(i)
 
-		_, tag, err := ParseAddress(strAddr)
+		_, memo, err := ParseAddress(strAddr)
 
 		assert.NoError(t, err)
-		assert.Equal(t, i, tag)
+		assert.Equal(t, i, memo)
 	}
 }
 
-func TestParseAddress_withSimpleTagSuffix(t *testing.T) {
+func TestParseAddress_withOpenMemoSuffix(t *testing.T) {
 	strAddr := "Like5DuaVTk8KgpRh98xDvHvnpaAWxSoYh6uLRvyar50666"
 
-	addr, tag, err := ParseAddress(strAddr)
+	addr, memo, err := ParseAddress(strAddr)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Like5DuaVTk8KgpRh98xDvHvnpaAWxSoYh6uLRvyar5", addr.String())
-	assert.EqualValues(t, 0x666, tag)
+	assert.EqualValues(t, 0x666, memo)
 }
 
 func TestParseAddress_fail(t *testing.T) {
@@ -103,19 +112,19 @@ func TestAddress_Hex(t *testing.T) {
 }
 
 func TestParseAddress_hex(t *testing.T) {
-	addr, tag, err := ParseAddress("0x9a8a9d2b5766b5c3962f4dd301c01765bdc37a6387f24250")
+	addr, memo, err := ParseAddress("0x9a8a9d2b5766b5c3962f4dd301c01765bdc37a6387f24250")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Like5DuaVTk8KgpRh98xDvHvnpaAWxSoYh6uLRvyar5", addr.String())
-	assert.EqualValues(t, 0, tag)
+	assert.EqualValues(t, 0, memo)
 }
 
-func TestParseAddress_hex_tag(t *testing.T) {
-	addr, tag, err := ParseAddress("0x9a8a9d2b5766b5c3962f4dd301c01765bdc37a6387f242500123456789abcdef")
+func TestParseAddress_hex_memo(t *testing.T) {
+	addr, memo, err := ParseAddress("0x9a8a9d2b5766b5c3962f4dd301c01765bdc37a6387f242500123456789abcdef")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Like5DuaVTk8KgpRh98xDvHvnpaAWxSoYh6uLRvyar5", addr.String())
-	assert.EqualValues(t, 0x0123456789abcdef, tag)
+	assert.EqualValues(t, 0x0123456789abcdef, memo)
 }
 
 func TestAddress_Encode_nilAddress(t *testing.T) {
