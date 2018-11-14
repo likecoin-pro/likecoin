@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/likecoin-pro/likecoin/services/client"
-
 	"github.com/likecoin-pro/likecoin/blockchain/db"
 	"github.com/likecoin-pro/likecoin/commons/log"
+	"github.com/likecoin-pro/likecoin/services/client"
 )
 
 type Service struct {
@@ -34,7 +33,7 @@ func (s *Service) startBlockchainReplication() {
 			log.Error.Printf("replication> loadBlocksBatch Error: %v", err)
 		}
 		if !ok || err != nil {
-			time.Sleep(time.Second)
+			time.Sleep(5 * time.Second)
 		}
 	}
 }
