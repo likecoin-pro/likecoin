@@ -12,11 +12,15 @@ import (
 var TestCounter = assets.Asset{1}
 
 type TestTxObject struct {
-	Transaction
+	tx  *Transaction
 	Msg string
 }
 
 var _ = RegisterTxObject(127, &TestTxObject{})
+
+func (obj *TestTxObject) SetContext(tx *Transaction) {
+	obj.tx = tx
+}
 
 func (obj *TestTxObject) Encode() []byte {
 	return bin.Encode(
@@ -30,13 +34,13 @@ func (obj *TestTxObject) Decode(data []byte) error {
 	)
 }
 
-func (obj *TestTxObject) Verify(tx *Transaction) error {
+func (obj *TestTxObject) Verify() error {
 	if len(obj.Msg) > 100 {
 		return errors.New("tx.msg is too long")
 	}
 	return nil
 }
 
-func (obj *TestTxObject) Execute(tx *Transaction, st *state.State) {
-	st.Increment(TestCounter, obj.Sender.Address(), bignum.NewInt(int64(len(obj.Msg))), 0)
+func (obj *TestTxObject) Execute(st *state.State) {
+	st.Increment(TestCounter, obj.tx.Sender.Address(), bignum.NewInt(int64(len(obj.Msg))), 0)
 }
