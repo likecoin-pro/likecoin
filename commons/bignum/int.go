@@ -2,6 +2,7 @@ package bignum
 
 import (
 	"encoding/json"
+	"io"
 	"math/big"
 
 	"github.com/denisskin/bin"
@@ -46,12 +47,13 @@ func (x Int) Bytes() []byte {
 	return x.i.Bytes()
 }
 
-func (x Int) BinWrite(w *bin.Writer) {
-	w.WriteBigInt(x.i)
+func (x Int) BinaryEncode(w io.Writer) error {
+	return bin.NewWriter(w).WriteBigInt(x.i)
 }
 
-func (x *Int) BinRead(r *bin.Reader) {
-	x.i, _ = r.ReadBigInt()
+func (x *Int) BinaryDecode(r io.Reader) (err error) {
+	x.i, err = bin.NewReader(r).ReadBigInt()
+	return
 }
 
 func (x Int) MarshalJSON() ([]byte, error) {
