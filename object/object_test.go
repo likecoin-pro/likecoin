@@ -2,6 +2,7 @@ package object
 
 import (
 	"github.com/likecoin-pro/likecoin/assets"
+	"github.com/likecoin-pro/likecoin/blockchain"
 	"github.com/likecoin-pro/likecoin/config"
 	"github.com/likecoin-pro/likecoin/crypto"
 )
@@ -16,10 +17,13 @@ var (
 	aliceAddr = aliceKey.PublicKey.Address()
 	bobAddr   = bobKey.PublicKey.Address()
 	bobID     = bobKey.PublicKey.ID()
+
+	testCfg = &blockchain.Config{
+		NetworkID: blockchain.NetworkTest,
+		ChainID:   1,
+	}
 )
 
 func init() {
-	config.NetworkID = 1 // test network
-	config.ChainID = 1
 	config.EmissionPublicKey = emissionKey.PublicKey
 }
