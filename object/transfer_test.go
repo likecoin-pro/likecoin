@@ -11,15 +11,15 @@ import (
 )
 
 func TestTransfer_Verify(t *testing.T) {
-	tx := NewSimpleTransfer(aliceKey, bobAddr, bignum.NewInt(100), coin, "transfer to Bob", 123, 1456)
+	tx := NewSimpleTransfer(testCfg, aliceKey, bobAddr, bignum.NewInt(100), coin, "transfer to Bob", 123, 1456)
 
-	err := tx.Verify()
+	err := tx.Verify(testCfg)
 
 	assert.NoError(t, err)
 }
 
 func TestTransfer_Encode(t *testing.T) {
-	tx := NewSimpleTransfer(aliceKey, bobAddr, bignum.NewInt(100), coin, "Test", 123, 456)
+	tx := NewSimpleTransfer(testCfg, aliceKey, bobAddr, bignum.NewInt(100), coin, "Test", 123, 456)
 
 	data := tx.Encode()
 
@@ -27,22 +27,22 @@ func TestTransfer_Encode(t *testing.T) {
 }
 
 func TestTransfer_Verify_fail(t *testing.T) {
-	tx := NewSimpleTransfer(aliceKey, bobAddr, bignum.NewInt(100), coin, "transfer to Bob", 123, 456)
+	tx := NewSimpleTransfer(testCfg, aliceKey, bobAddr, bignum.NewInt(100), coin, "transfer to Bob", 123, 456)
 
 	tx.Sig[3]++ // corrupt sign
 
-	err := tx.Verify()
+	err := tx.Verify(testCfg)
 
 	assert.Error(t, err)
 }
 
 func TestTransfer_JSONMarshal(t *testing.T) {
-	tx := NewSimpleTransfer(aliceKey, bobAddr, bignum.NewInt(1.5e9), coin, "transfer to Bob", 123, 456)
+	tx := NewSimpleTransfer(testCfg, aliceKey, bobAddr, bignum.NewInt(1.5e9), coin, "transfer to Bob", 123, 456)
 
 	data, err := json.Marshal(tx.TxObject())
 
 	assert.NoError(t, err)
-	assert.NoError(t, tx.Verify())
+	assert.NoError(t, tx.Verify(testCfg))
 	assert.JSONEq(t, `{
 	  "comment": "transfer to Bob",
 	  "outs": [
@@ -51,8 +51,10 @@ func TestTransfer_JSONMarshal(t *testing.T) {
 		  "amount": 1500000000,
 		  "tag": 123,
 		  "to": "Like4ujgQHL98BH21cPowptBCCTtHbAoygbjEU4iYmi",
-		  "to_tag": 456,
-		  "to_chain": 1
+		  "to_memo": 456,
+		  "to_memo_address": "Like2KAAshsYmxGiMapWx3v6k4TZzLfZma6asRZmyfmhF5",
+		  "to_chain": 1,
+		  "to_nick": ""
 		}
 	  ]
 	}`, string(data))
@@ -67,8 +69,10 @@ func TestTransfer_JSONUnmarshal(t *testing.T) {
 		  "amount": 1500000000,
 		  "tag": 123,
 		  "to": "Like4ujgQHL98BH21cPowptBCCTtHbAoygbjEU4iYmi",
-		  "to_tag": 456,
-		  "to_chain": 1
+		  "to_memo": 456,
+		  "to_memo_address": "Like2KAAshsYmxGiMapWx3v6k4TZzLfZma6asRZmyfmhF5",
+		  "to_chain": 1,
+		  "to_nick": ""
 		}
 	  ]
 	}`)

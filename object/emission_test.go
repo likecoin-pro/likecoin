@@ -12,30 +12,30 @@ import (
 
 func TestEmission_Verify(t *testing.T) {
 
-	tx := NewEmission(emissionKey, coin, bignum.NewInt(1e9), "emission#1", []*EmissionOut{
+	tx := NewEmission(testCfg, emissionKey, coin, bignum.NewInt(1e9), "emission#1", []*EmissionOut{
 		{aliceAddr, +200, "GDHxcxjUGAs", 888},
 		{bobAddr, +100, "tDxrdnk4e5g", 777},
 	})
 
-	err := tx.Verify()
+	err := tx.Verify(testCfg)
 
 	assert.NoError(t, err)
 }
 
 func TestEmission_Verify_fail(t *testing.T) {
-	tx := NewEmission(emissionKey, coin, bignum.NewInt(1e9), "emission#1", []*EmissionOut{
+	tx := NewEmission(testCfg, emissionKey, coin, bignum.NewInt(1e9), "emission#1", []*EmissionOut{
 		{aliceAddr, +200, "GDHxcxjUGAs", 888},
 		{bobAddr, +100, "tDxrdnk4e5g", 777},
 	})
 	tx.Sig[3]++ // corrupt signature
 
-	err := tx.Verify()
+	err := tx.Verify(testCfg)
 
 	assert.Error(t, err)
 }
 
 func TestEmission_Decode(t *testing.T) {
-	data := NewEmission(emissionKey, coin, bignum.NewInt(1e9), "emission#1", []*EmissionOut{
+	data := NewEmission(testCfg, emissionKey, coin, bignum.NewInt(1e9), "emission#1", []*EmissionOut{
 		{aliceAddr, +200, "GDHxcxjUGAs", 888},
 		{bobAddr, +100, "tDxrdnk4e5g", 777},
 	}).Encode()
@@ -44,7 +44,7 @@ func TestEmission_Decode(t *testing.T) {
 	err := tx.Decode(data)
 
 	assert.NoError(t, err)
-	assert.NoError(t, tx.Verify())
+	assert.NoError(t, tx.Verify(testCfg))
 	assert.JSONEq(t, `
 	{
 	  "asset":   "0x0001",
@@ -70,7 +70,7 @@ func TestEmission_Decode(t *testing.T) {
 
 func TestEmission_JSONMarshal(t *testing.T) {
 
-	tx := NewEmission(emissionKey, coin, bignum.NewInt(1e9), "emission#1", []*EmissionOut{
+	tx := NewEmission(testCfg, emissionKey, coin, bignum.NewInt(1e9), "emission#1", []*EmissionOut{
 		{aliceAddr, +200, "GDHxcxjUGAs", 777},
 		{bobAddr, +100, "tDxrdnk4e5g", 888},
 	})
