@@ -28,23 +28,12 @@ type BCContext interface {
 }
 
 // todo: StateTree() move to *State
-// todo: tx.Execute() -> stateUpdates, stateRoot, err
 
 func GenerateNewBlock(
 	pre *BlockHeader,
 	txs []*Transaction,
 	prv *crypto.PrivateKey,
 	bc BCContext,
-) (block *Block, err error) {
-	return GenerateNewBlockEx(pre, txs, prv, bc, timestamp(), 0)
-}
-
-func GenerateNewBlockEx(
-	pre *BlockHeader,
-	txs []*Transaction,
-	prv *crypto.PrivateKey,
-	bc BCContext,
-	timestamp int64,
 	nonce uint64,
 ) (block *Block, err error) {
 
@@ -72,7 +61,7 @@ func GenerateNewBlockEx(
 		ChainID:   pre.ChainID,
 		Num:       pre.Num + 1,
 		PrevHash:  pre.Hash(),
-		Timestamp: timestamp,
+		Timestamp: timestamp(),
 		Nonce:     nonce,
 		Miner:     prv.PublicKey,
 	}, validTxs}
