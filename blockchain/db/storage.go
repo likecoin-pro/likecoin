@@ -32,6 +32,7 @@ type BlockchainStorage struct {
 	stat         *Statistic        //
 	cacheHeaders *gosync.Cache     // blockNum => *BlockHeader
 	cacheTxs     *gosync.Cache     // blockNum => []*Transaction
+	cacheIdxTx   *gosync.Cache     // idxKey => *Transaction
 	middleware   []Middleware      //
 }
 
@@ -77,6 +78,7 @@ func NewBlockchainStorage(cfg *blockchain.Config) (s *BlockchainStorage) {
 		db:           goldb.NewStorage(cfg.DataDir, nil),
 		cacheHeaders: gosync.NewCache(10000),
 		cacheTxs:     gosync.NewCache(1000),
+		cacheIdxTx:   gosync.NewCache(10000),
 		Mempool:      mempool.NewStorage(),
 	}
 
@@ -524,12 +526,19 @@ func (s *BlockchainStorage) TransactionByID(txID uint64) (*blockchain.Transactio
 	return s.transactionByIdxKey(goldb.Key(dbIdxTxID, txID))
 }
 
-func (s *BlockchainStorage) transactionByIdxKey(idxKey []byte) (*blockchain.Transaction, error) {
-	if txUID, err := s.db.GetID(idxKey); err != nil {
-		return nil, err
-	} else {
-		return s.transactionByUID(txUID)
+func (s *BlockchainStorage) transactionByIdxKey(idxKey []byte) (tx *blockchain.Transaction, err error) {
+	if tx, _ = s.cacheIdxTx.Get(idxKey).(*blockchain.Transaction); tx != nil {
+		return
 	}
+	txUID, err := s.db.GetID(idxKey)
+	if err != nil {
+		return
+	}
+	tx, err = s.transactionByUID(txUID)
+	if tx != nil {
+		s.cacheIdxTx.Set(idxKey, tx)
+	}
+	return
 }
 
 func (s *BlockchainStorage) fetchTransactionsByIndex(q *goldb.Query, fn func(tx *blockchain.Transaction) error) error {
