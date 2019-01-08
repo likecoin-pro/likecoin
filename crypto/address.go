@@ -76,7 +76,7 @@ func (addr *Address) Decode(data []byte) error {
 	if len(data) != AddressLength {
 		return errAddrInvalidLength
 	}
-	copy(addr[:], data[:AddressLength])
+	copy(addr[:], data)
 	return nil
 }
 
