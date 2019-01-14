@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
-
-	"github.com/likecoin-pro/likecoin/crypto/secp256k1"
-	"github.com/likecoin-pro/likecoin/crypto/sha3"
+	"strings"
 
 	"github.com/likecoin-pro/likecoin/crypto/base58"
 	"github.com/likecoin-pro/likecoin/crypto/merkle"
+	"github.com/likecoin-pro/likecoin/crypto/secp256k1"
+	"github.com/likecoin-pro/likecoin/crypto/sha3"
 )
 
 type PublicKey struct {
@@ -28,11 +28,16 @@ func (pub *PublicKey) Empty() bool {
 }
 
 func (pub *PublicKey) String() string {
+	return "0x" + hex.EncodeToString(pub.Encode())
+}
+
+func (pub *PublicKey) Str58() string {
 	return base58.Encode(pub.Encode())
 }
 
+// deprecated
 func (pub *PublicKey) Hex() string {
-	return "0x" + hex.EncodeToString(pub.bytes()[1:])
+	return pub.String()
 }
 
 func (pub *PublicKey) Equal(p *PublicKey) bool {
@@ -142,15 +147,20 @@ func MustParsePublicKey(pubkey string) *PublicKey {
 	}
 }
 
-func ParsePublicKey(str64 string) (pub *PublicKey, err error) {
-	data, err := base58.DecodeFixed(str64, publicKeySize)
+func ParsePublicKey(s string) (pub *PublicKey, err error) {
+	var data []byte
+	if strings.HasPrefix(s, "0x") {
+		data, err = hex.DecodeString(s[2:])
+	} else {
+		data, err = base58.DecodeFixed(s, publicKeySize)
+	}
 	if err != nil {
 		return
 	}
-	return DecodePublicKey(data)
+	return decodePublicKey(data)
 }
 
-func DecodePublicKey(data []byte) (pub *PublicKey, err error) {
+func decodePublicKey(data []byte) (pub *PublicKey, err error) {
 	pub = &PublicKey{}
 	err = pub.Decode(data)
 	return
