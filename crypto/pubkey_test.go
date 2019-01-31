@@ -31,26 +31,26 @@ func TestDecodePublicKey(t *testing.T) {
 	pub1 := NewPrivateKey().PublicKey
 	buf := pub1.Encode()
 
-	pub2, err := DecodePublicKey(buf)
+	pub2, err := decodePublicKey(buf)
 
 	assert.NoError(t, err)
 	assert.Equal(t, pub1, pub2)
 }
 
 func TestPublicKey_String(t *testing.T) {
-	pub := MustParsePublicKey("rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR")
+	pub := MustParsePublicKey("0x02e236b8874998a00e5848ab5bbb22a9e91af9415c554eeccf7faa8ecc2bfa9c0c")
 
 	str := pub.String()
 
-	assert.Equal(t, "rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR", str)
+	assert.Equal(t, "0x02e236b8874998a00e5848ab5bbb22a9e91af9415c554eeccf7faa8ecc2bfa9c0c", str)
 }
 
-func TestPublicKey_Hex(t *testing.T) {
-	pub := NewPrivateKeyBySecret("abc").PublicKey
+func TestPublicKey_Str58(t *testing.T) {
+	pub := MustParsePublicKey("0x02e236b8874998a00e5848ab5bbb22a9e91af9415c554eeccf7faa8ecc2bfa9c0c")
 
-	hex := pub.Hex()
+	str58 := pub.Str58()
 
-	assert.Equal(t, "0x022f86f8c408c20e8bdcef6471676a2157624915355fe662b568ac5e2a2a76fed5d34d4a184176a3e4a28bac7203a860510e363601f7c8f8657067173ed83f6e", hex)
+	assert.Equal(t, "rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR", str58)
 }
 
 func TestPublicKey_MarshalJSON(t *testing.T) {
@@ -59,7 +59,7 @@ func TestPublicKey_MarshalJSON(t *testing.T) {
 	data, err := json.Marshal(pub)
 
 	assert.NoError(t, err)
-	assert.Equal(t, `"rggH2X4N7JsBtekY1isiutwJZpRhQQoeYaVqYdRSH4mR"`, string(data))
+	assert.Equal(t, `"0x02e236b8874998a00e5848ab5bbb22a9e91af9415c554eeccf7faa8ecc2bfa9c0c"`, string(data))
 }
 
 func TestPublicKey_UnmarshalJSON(t *testing.T) {
