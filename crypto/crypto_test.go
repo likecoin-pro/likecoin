@@ -15,8 +15,7 @@ func Test_data(t *testing.T) {
 	addrHex := addr.Hex()
 
 	assert.Equal(t, "0x01fd5a70cc093eca84e98cd8b0ba9c4670aecc695b20b09ad0918ab4922a3fd7ad", prv.String())
-	assert.Equal(t, "y32va5HWnYeZpqg4TJ2ydFiauspUUwZ4bswwz6NMDTNq", pub.String())
-	assert.Equal(t, "0x4093cdf68e4fbeea9307530b20138fd56675f386a4eb0daa1f8067435e4eef9ac29042e58725dbb9247699460ede385c80ceac2409eeadd88ab329496875ae0d", pub.Hex())
+	assert.Equal(t, "0x034093cdf68e4fbeea9307530b20138fd56675f386a4eb0daa1f8067435e4eef9a", pub.String())
 	assert.Equal(t, "Like62D4Rq3s8D4Y5Q92YBoRiVpcMFEcXTyGLbqrtAv", addr.String())
 	assert.Equal(t, "0xe8284b25224d6eac303d80f493774cb8369e9eff304ef786", addrHex)
 }
