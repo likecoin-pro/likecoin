@@ -39,7 +39,7 @@ func (c *Client) httpGet(path string, q url.Values, v interface{}, fn func()) (e
 		return
 	}
 	for r := bin.NewReader(resp.Body); err == nil; {
-		if err = r.ReadVar(v); err == nil {
+		if err = r.ReadVar(v); err == nil && fn != nil {
 			fn()
 		}
 	}
@@ -65,7 +65,7 @@ func (c *Client) httpPost(path string, data []byte) (err error) {
 }
 
 func (c *Client) httpGetVal(path string, q url.Values, v interface{}) (err error) {
-	return c.httpGet(path, q, v, func() {})
+	return c.httpGet(path, q, v, nil)
 }
 
 func (c *Client) GetBlock(num uint64) (block *blockchain.Block, err error) {
@@ -79,7 +79,9 @@ func (c *Client) GetBlocks(offset uint64, limit int) (blocks []*blockchain.Block
 		"offset": {fmt.Sprint(offset)},
 		"limit":  {fmt.Sprint(limit)},
 	}, &block, func() {
-		blocks = append(blocks, block)
+		if block != nil {
+			blocks = append(blocks, block)
+		}
 	})
 	return
 }
