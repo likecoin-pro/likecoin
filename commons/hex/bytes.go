@@ -3,6 +3,7 @@ package hex
 import (
 	"encoding/hex"
 	"encoding/json"
+	"io"
 
 	"github.com/denisskin/bin"
 )
@@ -13,12 +14,13 @@ func (b Bytes) String() string {
 	return hex.EncodeToString(b)
 }
 
-func (b Bytes) BinWrite(w *bin.Writer) {
-	w.WriteBytes([]byte(b))
+func (b Bytes) BinaryEncode(w io.Writer) error {
+	return bin.NewWriter(w).WriteBytes([]byte(b))
 }
 
-func (b *Bytes) BinRead(r *bin.Reader) {
-	*b, _ = r.ReadBytes()
+func (b *Bytes) BinaryDecode(r io.Reader) (err error) {
+	*b, err = bin.NewReader(r).ReadBytes()
+	return
 }
 
 func (b Bytes) MarshalJSON() ([]byte, error) {
