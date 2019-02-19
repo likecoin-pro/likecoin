@@ -2,8 +2,8 @@ package hex
 
 import (
 	"encoding/json"
+	"io"
 	"strconv"
-
 	"strings"
 
 	"github.com/denisskin/bin"
@@ -15,13 +15,14 @@ func (i Uint64) String() string {
 	return EncodeUint(uint64(i))
 }
 
-func (i Uint64) BinWrite(w *bin.Writer) {
-	w.WriteVarUint64(uint64(i))
+func (i Uint64) BinaryEncode(w io.Writer) error {
+	return bin.NewWriter(w).WriteVarUint64(uint64(i))
 }
 
-func (i *Uint64) BinRead(r *bin.Reader) {
-	num, _ := r.ReadVarUint64()
-	*i = Uint64(num)
+func (i *Uint64) BinaryDecode(r io.Reader) (err error) {
+	u, err := bin.NewReader(r).ReadVarUint64()
+	*i = Uint64(u)
+	return
 }
 
 func (i Uint64) MarshalJSON() ([]byte, error) {
