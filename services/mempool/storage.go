@@ -45,15 +45,7 @@ func (s *Storage) SizeOf(txType blockchain.TxType) (count int) {
 	return
 }
 
-func (s *Storage) Put(tx *blockchain.Transaction) (err error) {
-	s.mx.Lock()
-	defer s.mx.Unlock()
-
-	s.txs[tx.ID()] = tx
-	return
-}
-
-func (s *Storage) PutTxs(txs []*blockchain.Transaction) (err error) {
+func (s *Storage) PutTx(txs ...*blockchain.Transaction) (err error) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
