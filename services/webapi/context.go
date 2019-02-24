@@ -152,7 +152,7 @@ func (ctx *Context) Exec() {
 	case path == "/new-txs":
 		var txs []*blockchain.Transaction
 		ctx.parseRequestBody(&txs)
-		err := ctx.bc.Mempool.PutTxs(txs)
+		err := ctx.bc.Mempool.PutTx(txs...)
 		ctx.WriteObject(len(txs), err)
 
 	case path == "/new-transfer":
@@ -165,8 +165,8 @@ func (ctx *Context) Exec() {
 		if err := tx.Verify(ctx.bc.Cfg); err != nil {
 			ctx.Panic400(err)
 		}
-		ctx.bc.Mempool.Put(tx)
-		ctx.WriteObject(tx)
+		err := ctx.bc.Mempool.PutTx(tx)
+		ctx.WriteObject(tx, err)
 
 	case path == "/new-key":
 		prv := ctx.getPrvKey() // prv OR seed
@@ -207,8 +207,8 @@ func (ctx *Context) Exec() {
 		if err := tx.Verify(ctx.bc.Cfg); err != nil {
 			ctx.Panic400(err)
 		}
-		ctx.bc.Mempool.Put(tx)
-		ctx.WriteObject(tx)
+		err := ctx.bc.Mempool.PutTx(tx)
+		ctx.WriteObject(tx, err)
 
 		// /blocks
 	case path == "/blocks":
