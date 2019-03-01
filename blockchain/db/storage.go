@@ -56,6 +56,7 @@ const (
 	dbIdxSourceAddr    = 0x26 // (providerID, sourceID, addr)  => total supply by addr
 	dbIdxInvites       = 0x27 // (userID, txNum)               => invitedUserID
 	dbIdxSrcInvites    = 0x28 // (userID, txNum)               => invitedUserID
+	dbIdxBalances      = 0x29 // (asset, addr)                 => balance
 )
 
 var (
@@ -141,12 +142,8 @@ func (s *BlockchainStorage) State() *state.State {
 }
 
 //----------------- put block --------------------------
-func (s *BlockchainStorage) PutBlock(block *blockchain.Block) error {
-	return s.PutBlocks([]*blockchain.Block{block})
-}
-
 // open db.transaction; verify block; save block and index-records
-func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
+func (s *BlockchainStorage) PutBlock(blocks ...*blockchain.Block) error {
 	if len(blocks) == 0 {
 		return nil
 	}
@@ -283,6 +280,11 @@ func (s *BlockchainStorage) PutBlocks(blocks []*blockchain.Block) error {
 
 						tr.PutVar(goldb.Key(dbIdxAssetAddr, v.Asset, v.Address, txUID, stIdx), v.Balance)
 
+						if !v.Balance.IsZero() {
+							tr.PutVar(goldb.Key(dbIdxBalances, v.Asset, v.Address), v.Balance)
+						} else {
+							tr.Delete(goldb.Key(dbIdxBalances, v.Asset, v.Address))
+						}
 						if v.Memo != 0 { // change state with memo
 							tr.PutVar(goldb.Key(dbIdxAssetAddrMemo, v.Asset, v.Address, v.Memo, txUID, stIdx), v.Balance)
 						}
@@ -714,7 +716,6 @@ func (s *BlockchainStorage) UserByID(userID uint64) (tx *blockchain.Transaction,
 
 // UserByStr returns user-info by nickname "@nick" or by address "LikeXXXXXXXXXXXX"
 func (s *BlockchainStorage) UserByStr(nameOrAddr string) (tx *blockchain.Transaction, u *object.User, err error) {
-
 	if len(nameOrAddr) == 0 {
 		return
 	}
@@ -725,7 +726,15 @@ func (s *BlockchainStorage) UserByStr(nameOrAddr string) (tx *blockchain.Transac
 	if err != nil {
 		return
 	}
-	return s.UserByID(addr.ID())
+	return s.UserByAddress(addr)
+}
+
+func (s *BlockchainStorage) UserByAddress(addr crypto.Address) (*blockchain.Transaction, *object.User, error) {
+	if tx, u, err := s.UserByID(addr.ID()); err == nil && tx != nil && addr.Equal(tx.SenderAddress()) {
+		return tx, u, nil
+	} else {
+		return nil, nil, err
+	}
 }
 
 func (s *BlockchainStorage) UserByNick(name string) (tx *blockchain.Transaction, u *object.User, err error) {
