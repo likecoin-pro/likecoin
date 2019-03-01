@@ -61,7 +61,7 @@ func GenerateNewBlock(
 		ChainID:   pre.ChainID,
 		Num:       pre.Num + 1,
 		PrevHash:  pre.Hash(),
-		Timestamp: timestamp(),
+		Timestamp: Timestamp(),
 		Nonce:     nonce,
 		Miner:     prv.PublicKey,
 	}, validTxs}

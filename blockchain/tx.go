@@ -44,7 +44,7 @@ type Transaction struct {
 
 func NewTx(cfg *Config, sender *crypto.PrivateKey, nonce uint64, obj TxObject) *Transaction {
 	if nonce == 0 {
-		nonce = uint64(timestamp())
+		nonce = uint64(Timestamp())
 	}
 	tx := &Transaction{
 		Type:    typeByObject(obj), //

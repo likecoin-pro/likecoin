@@ -26,8 +26,8 @@ var (
 	testTimer int64
 )
 
-// returns current timestamp in microsec
-func timestamp() int64 {
+// Timestamp returns current timestamp in µsec
+func Timestamp() int64 {
 	if testMode {
 		return atomic.AddInt64(&testTimer, 1)
 	}
