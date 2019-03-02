@@ -77,9 +77,9 @@ func NewBlockchainStorage(cfg *blockchain.Config) (s *BlockchainStorage) {
 	s = &BlockchainStorage{
 		Cfg:          cfg,
 		db:           goldb.NewStorage(cfg.DataDir, nil),
-		cacheHeaders: gosync.NewCache(10000),
-		cacheTxs:     gosync.NewCache(1000),
-		cacheIdxTx:   gosync.NewCache(10000),
+		cacheHeaders: gosync.NewCache(100000),
+		cacheTxs:     gosync.NewCache(100000),
+		cacheIdxTx:   gosync.NewCache(30000),
 		Mempool:      mempool.NewStorage(),
 	}
 
