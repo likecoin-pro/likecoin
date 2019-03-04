@@ -45,14 +45,16 @@ func (t *Tree) PutVar(key, value interface{}) (err error) {
 	return t.Put(encode(key), encode(value))
 }
 
-func decode(data []byte, v interface{}) error {
+func decode(data []byte, v interface{}) (err error) {
 	switch v := v.(type) {
 	case *[]byte:
 		*v = data
 	case *string:
 		*v = string(data)
+	default:
+		err = bin.Decode(data, v)
 	}
-	return bin.Decode(data, v)
+	return
 }
 
 func encode(v interface{}) []byte {
@@ -61,8 +63,9 @@ func encode(v interface{}) []byte {
 		return v
 	case string:
 		return []byte(v)
+	default:
+		return bin.Encode(v)
 	}
-	return bin.Encode(v)
 }
 
 func (t *Tree) Put(key, value []byte) (err error) {
@@ -96,10 +99,10 @@ func (t *Tree) Get(key []byte) (value []byte, err error) {
 
 func (t *Tree) GetVar(key, v interface{}) (err error) {
 	data, err := t.Get(encode(key))
-	if err == nil {
-		err = decode(data, v)
+	if err != nil {
+		return
 	}
-	return
+	return decode(data, v)
 }
 
 func (t *Tree) GetProof(key []byte) (value, proof, root []byte, err error) {
