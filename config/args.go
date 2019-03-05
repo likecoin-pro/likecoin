@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	Version         = "0.1.003"
+	Version         = "0.1.4"
 	ApplicationName = "likecd"
 )
 
