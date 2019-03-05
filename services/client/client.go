@@ -15,7 +15,12 @@ type Client struct {
 	apiAddr string
 }
 
+const DefaultAPIAddress = "http://likecoin.pro/api/v0"
+
 func NewClient(apiAddr string) *Client {
+	if apiAddr == "" {
+		apiAddr = DefaultAPIAddress
+	}
 	return &Client{
 		apiAddr: apiAddr,
 	}
@@ -29,7 +34,13 @@ func (c *Client) httpGet(path string, q url.Values, v interface{}, fn func()) (e
 
 	sURL := c.apiAddr + path + "?" + q.Encode()
 
-	resp, err := http.Get(sURL)
+	req, err := http.NewRequest("GET", sURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "binary")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
