@@ -29,7 +29,10 @@ type EmissionOut struct {
 
 var _ = blockchain.RegisterTxObject(TxTypeEmission, &Emission{})
 
-const ReferralRewardTxComment = "referral_reward"
+const (
+	ReferralRewardTxComment = "referral_reward"
+	PoSMintingTxComment     = "pos_minting"
+)
 
 var (
 	ErrEmissionTxEmptyAddr      = errors.New("emission-tx: empty address")
@@ -104,6 +107,10 @@ func (obj *Emission) IsReferralReward() bool {
 	return obj.Comment == ReferralRewardTxComment
 }
 
+func (obj *Emission) IsPoSMinting() bool {
+	return obj.Comment == PoSMintingTxComment
+}
+
 func (obj *Emission) TotalDelta() (likes int64) {
 	for _, out := range obj.Outs {
 		likes += out.Delta
@@ -134,12 +141,12 @@ func (obj *Emission) Verify() error {
 	}
 
 	for _, out := range obj.Outs {
-		if out.Delta < 0 || out.SourceValue < 0 || out.Delta > out.SourceValue {
+		if out.Delta < 0 || out.SourceValue < 0 {
 			return ErrEmissionTxIncorrectDelta
 		}
-		if out.SourceID == "" {
-			return ErrEmissionTxEmptySourceID
-		}
+		//if out.SourceID == "" {
+		//	return ErrEmissionTxEmptySourceID
+		//}
 		if out.Address.Empty() && out.Delta > 0 {
 			return ErrEmissionTxEmptyAddr
 		}
