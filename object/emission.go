@@ -100,7 +100,7 @@ func (obj *Emission) Amount(delta int64) bignum.Int {
 }
 
 func (obj *Emission) IsPrimaryEmission() bool {
-	return !obj.IsReferralReward()
+	return obj.Comment == ""
 }
 
 func (obj *Emission) IsReferralReward() bool {
