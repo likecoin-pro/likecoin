@@ -6,6 +6,7 @@ import (
 
 	"github.com/likecoin-pro/likecoin/blockchain/db"
 	"github.com/likecoin-pro/likecoin/commons/log"
+	"github.com/likecoin-pro/likecoin/config"
 )
 
 type WebServer struct {
@@ -23,7 +24,7 @@ func StartServer(cfg *Config, bc *db.BlockchainStorage) error {
 
 func (s *WebServer) Start() error {
 
-	log.Info.Printf("webapi> Start Server: %s", s.cfg.HTTPConnStr)
+	log.Printf("webapi> Start Server (ver: %s) http: %s", config.Version, s.cfg.HTTPConnStr)
 
 	server := &http.Server{
 		Addr:           s.cfg.HTTPConnStr,

@@ -79,7 +79,8 @@ API /v0/
 	&memo=<memo:uint64>
 	&offset=<ts:int>
 	&limit=<limit:int>
-	&order=asc|desc
+	&order=asc|desc			(by default: asc)
+	&txType=-1|0|1|2 		(by default: -1)
 
 ./txs/<address>					-> synonym of /txs/?address=<address>
 
@@ -221,10 +222,10 @@ func (ctx *Context) Exec() {
 
 	// 	/txs/<address>  OR   /address/<address>/txs
 	case pathMatch(reTxsAddr) || pathMatch(reAddrTxs):
-		addr, memo, asset, offset, limit, order := ctx.parseQueryParams(q[1])
+		addr, memo, asset, offset, limit, order, txType := ctx.parseQueryParams(q[1])
 		strm := ctx.OpenStream()
 		defer strm.Close()
-		ctx.bc.FetchTransactionsByAddr(asset, addr, memo, offset, limit, order, func(tx *blockchain.Transaction, _ bignum.Int) error {
+		ctx.bc.FetchTransactionsByAddr(asset, addr, memo, offset, limit, order, txType, func(tx *blockchain.Transaction, _ bignum.Int) error {
 			return strm.WriteObject(tx)
 		})
 
@@ -496,7 +497,7 @@ var defaultAsset = assets.Default.String()
 func (c *Context) getAsset() assets.Asset {
 	asset, err := assets.ParseAsset(c.Get("asset", defaultAsset))
 	if err != nil {
-		c.Panic400Str("incorrect asset-params")
+		c.Panic400Str("incorrect asset-param")
 	}
 	return asset
 }
@@ -515,7 +516,15 @@ func (c *Context) getLimit() int64 {
 func (c *Context) getOffset() uint64 {
 	n, err := strconv.ParseUint(c.Get("offset", "0"), 0, 64)
 	if n < 0 || err != nil {
-		c.Panic400Str("incorrect offset-params")
+		c.Panic400Str("incorrect offset-param")
+	}
+	return n
+}
+
+func (c *Context) getTxType() int {
+	n, err := strconv.Atoi(c.Get("txtype", "-1"))
+	if err != nil {
+		c.Panic400Str("incorrect txtype-param")
 	}
 	return n
 }
@@ -527,17 +536,18 @@ func (c *Context) getOrder(defaultValue string) (desc bool) {
 	case "desc":
 		return true
 	}
-	c.Panic400Str("incorrect order-params")
+	c.Panic400Str("incorrect order-param")
 	return
 }
 
-func (c *Context) parseQueryParams(sAddr string) (addr crypto.Address, memo uint64, asset assets.Asset, offset uint64, limit int64, order bool) {
+func (c *Context) parseQueryParams(sAddr string) (addr crypto.Address, memo uint64, asset assets.Asset, offset uint64, limit int64, order bool, txType int) {
 	if sAddr != "" {
 		addr, memo, asset = c.parseAddress(sAddr)
 	}
 	offset = c.getOffset()
 	limit = c.getLimit()
 	order = c.getOrder("desc")
+	txType = c.getTxType()
 	return
 }
 
@@ -550,7 +560,7 @@ func (c *Context) parseAddress(s string) (addr crypto.Address, memo uint64, asse
 		if strings.HasSuffix(err.Error(), "not found") {
 			c.Panic404(err)
 		}
-		c.Panic400Str("incorrect address-params.\nError: " + err.Error())
+		c.Panic400Str("incorrect address-param.\nError: " + err.Error())
 	}
 	asset = c.getAsset()
 	if m := c.getMemo(); m != 0 {

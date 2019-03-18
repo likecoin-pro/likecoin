@@ -589,6 +589,7 @@ func (s *BlockchainStorage) FetchTransactionsByAddr(
 	offset uint64,
 	limit int64,
 	orderDesc bool,
+	txType int,
 	fn func(tx *blockchain.Transaction, val bignum.Int) error,
 ) error {
 	var q *goldb.Query
@@ -624,6 +625,9 @@ func (s *BlockchainStorage) FetchTransactionsByAddr(
 		if err != nil {
 			return err
 		}
+		if txType >= 0 && int(tx.Type) != txType {
+			return nil
+		}
 		var v bignum.Int
 		rec.MustDecode(&v)
 		limit--
@@ -638,7 +642,7 @@ func (s *BlockchainStorage) QueryTransaction(
 	offset uint64,
 	orderDesc bool,
 ) (tx *blockchain.Transaction, val bignum.Int, err error) {
-	err = s.FetchTransactionsByAddr(asset, addr, memo, offset, 1, orderDesc, func(t *blockchain.Transaction, v bignum.Int) error {
+	err = s.FetchTransactionsByAddr(asset, addr, memo, offset, 1, orderDesc, -1, func(t *blockchain.Transaction, v bignum.Int) error {
 		tx, val = t, v
 		return goldb.Break
 	})
@@ -652,8 +656,9 @@ func (s *BlockchainStorage) QueryTransactions(
 	offset uint64,
 	limitBlocks int64,
 	orderDesc bool,
+	txType int,
 ) (txs []*blockchain.Transaction, err error) {
-	err = s.FetchTransactionsByAddr(asset, addr, memo, offset, limitBlocks, orderDesc, func(tx *blockchain.Transaction, _ bignum.Int) error {
+	err = s.FetchTransactionsByAddr(asset, addr, memo, offset, limitBlocks, orderDesc, txType, func(tx *blockchain.Transaction, _ bignum.Int) error {
 		txs = append(txs, tx)
 		return nil
 	})
