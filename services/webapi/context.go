@@ -134,11 +134,6 @@ func (ctx *Context) Exec() {
 
 	switch {
 
-	// /  -> dashboard html-page
-	//case path == "/":
-	//	ctx.WriteHTML(htmlDashboard)
-	//	return
-
 	case path == "/info":
 		ctx.WriteObject(ctx.bc.Info())
 
@@ -157,9 +152,9 @@ func (ctx *Context) Exec() {
 		ctx.WriteObject(len(txs), err)
 
 	case path == "/new-transfer":
-		prv := ctx.getPrvKey()                  // prv OR seed
+		prv := ctx.getPrivateKey()              // private key by seed OR by login&password
 		addr, toMemo, asset := ctx.getAddress() // address
-		amount := ctx.getAmount("amount")       // amount
+		amount := ctx.getAmount()               // amount in nano-coins
 		comment := ctx.Get("comment", "")       // comment
 
 		tx := object.NewSimpleTransfer(ctx.bc.Cfg, prv, addr, amount, asset, comment, 0, toMemo)
@@ -170,7 +165,7 @@ func (ctx *Context) Exec() {
 		ctx.WriteObject(tx, err)
 
 	case path == "/new-key":
-		prv := ctx.getPrvKey() // prv OR seed
+		prv := ctx.getPrivateKey() // prv OR seed
 		memo := ctx.getMemo()
 		addr := prv.PublicKey.Address()
 		ctx.WriteObject(struct {
@@ -200,8 +195,8 @@ func (ctx *Context) Exec() {
 		})
 
 	case path == "/new-user":
-		prv := ctx.getPrvKey()             // prv OR secret
-		nick := ctx.Get("nick", "")        // users nickname
+		prv := ctx.getPrivateKey()         // private key by seed OR by login&password
+		nick := ctx.getNickname()          // users nickname
 		refID := ctx.getUint("ref", 0, 16) // referrer
 
 		tx := object.NewUser(ctx.bc.Cfg, prv, nick, refID, nil)
@@ -473,9 +468,12 @@ func (c *Context) getMemo() uint64 {
 	return c.getUint("memo", 0, 0)
 }
 
-func (c *Context) getPrvKey() *crypto.PrivateKey {
+func (c *Context) getPrivateKey() *crypto.PrivateKey {
 	if seed := c.Get("seed", ""); seed != "" {
 		return crypto.NewPrivateKeyBySecret(seed)
+	}
+	if login := c.getNickname(); login != "" {
+		return crypto.NewPrivateKeyBySecret(login + "::" + c.Get("password", ""))
 	}
 	prv, err := crypto.ParsePrivateKey(c.Get("prv", ""))
 	if err != nil {
@@ -484,8 +482,15 @@ func (c *Context) getPrvKey() *crypto.PrivateKey {
 	return prv
 }
 
-func (c *Context) getAmount(param string) bignum.Int {
-	v, err := strconv.ParseUint(c.Get(param, "0"), 10, 64)
+func (c *Context) getNickname() string {
+	if s := c.Get("login", ""); s != "" { // synonym of nick-param (legacy code)
+		return s
+	}
+	return c.Get("nick", "")
+}
+
+func (c *Context) getAmount() bignum.Int {
+	v, err := strconv.ParseUint(c.Get("amount", "0"), 10, 64)
 	if err != nil {
 		c.Panic400Str("incorrect amount-param")
 	}
