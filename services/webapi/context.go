@@ -304,16 +304,6 @@ func (c *Context) Panic400Str(err string) {
 	c.Panic400(errors.New(err))
 }
 
-//func (c *Context) SetMaxExpire() {
-//	c.SetExpire(time.Hour * 24 * 365 * 10)
-//}
-//
-//func (c *Context) SetExpire(t time.Duration) {
-//	c.rw.Header().Set("Cache-Control", fmt.Sprintf("max-age:%d, public", int(t.Seconds())))
-//	c.rw.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
-//	c.rw.Header().Set("Expires", time.Now().Add(t).Format(http.TimeFormat))
-//}
-
 func (c *Context) WriteHTML(data []byte, ee ...error) {
 	if len(ee) > 0 && ee[0] != nil {
 		c.Panic500(ee[0])
@@ -475,9 +465,13 @@ func (c *Context) getPrivateKey() *crypto.PrivateKey {
 	if login := c.getNickname(); login != "" {
 		return crypto.NewPrivateKeyBySecret(login + "::" + c.Get("password", ""))
 	}
-	prv, err := crypto.ParsePrivateKey(c.Get("prv", ""))
+	var strPrivateKey = c.Get("private", "")
+	if s := c.Get("prv", ""); s != "" { // synonym of private-param (legacy code)
+		strPrivateKey = s
+	}
+	prv, err := crypto.ParsePrivateKey(strPrivateKey)
 	if err != nil {
-		c.Panic400Str("incorrect prv-param")
+		c.Panic400Str("incorrect private key-param")
 	}
 	return prv
 }

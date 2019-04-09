@@ -33,3 +33,87 @@ nohup ./likecd -http=localhost:8888 -db=$HOME/likecd.db < /dev/null >/var/log/li
 ``` shell
 http://localhost:8888/info?pretty
 ```
+
+## Node REST API
+``` 
+http://127.0.0.1:8888/<command>? [&pretty] &<param>=<value>.... 
+```
+
+##### Get general node and blockchain information
+``` 
+GET /info 
+```
+
+##### Get block 
+``` 
+GET /block/<blockNum> 
+```
+
+##### Get blocks
+``` 
+GET /blocks?offset=<blockNum>&limit=<countBlocks> 
+```
+
+##### Get transaction 
+``` 
+GET /tx/<txID:hex> 
+```
+
+##### Get address info 
+``` 
+GET /address/<address> 
+GET /address/@<username>
+GET /address/0x<hexUserID> 
+GET /address/?address=<address> 
+```
+
+##### Generate new address with Memo 
+``` 
+GET /address/?address&memo  
+```
+
+##### Get address info + memo code 
+``` 
+GET /address/<address>  
+    params:
+        [memo=<memo>]
+```     
+ 
+
+##### Get transaction list by address (+memo)
+``` 
+GET /txs/<address|@username>/
+    params: 
+        [memo=<num|hex>] 
+        [limit=<int>] 
+        [order="asc"|"desc"] 
+        [offset=<hex>]
+```
+
+##### Register new user in blockchain
+``` 
+POST /new-user?
+    params:
+        login=<nickname>
+        password=<password>
+```
+
+##### Generate new key pair, address by secret-phrase
+``` 
+POST /new-key?
+    params: 
+        seed=<secret_phrase>
+```
+
+##### Transfer founds to address
+``` 
+POST /new-transfer?
+    params: 
+        (seed=<secret_phrase>|login&password|private=<hex>) 
+        address=<address> 
+        [memo=<num|hex>] 
+        amount=<integer_in_nano_coins> 
+        [comment] 
+        [nonce=<num|hex>] 
+```
+
