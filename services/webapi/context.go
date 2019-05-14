@@ -462,18 +462,25 @@ func (c *Context) getPrivateKey() *crypto.PrivateKey {
 	if seed := c.Get("seed", ""); seed != "" {
 		return crypto.NewPrivateKeyBySecret(seed)
 	}
+	if s := c.Get("prv", ""); s != "" { // synonym of private-param (legacy code)
+		if prv, err := crypto.ParsePrivateKey(s); err != nil {
+			c.Panic400Str("incorrect private key-param")
+		} else {
+			return prv
+		}
+	}
+	if s := c.Get("private", ""); s != "" {
+		if prv, err := crypto.ParsePrivateKey(s); err != nil {
+			c.Panic400Str("incorrect private key-param")
+		} else {
+			return prv
+		}
+	}
 	if login := c.getNickname(); login != "" {
 		return crypto.NewPrivateKeyBySecret(login + "::" + c.Get("password", ""))
 	}
-	var strPrivateKey = c.Get("private", "")
-	if s := c.Get("prv", ""); s != "" { // synonym of private-param (legacy code)
-		strPrivateKey = s
-	}
-	prv, err := crypto.ParsePrivateKey(strPrivateKey)
-	if err != nil {
-		c.Panic400Str("incorrect private key-param")
-	}
-	return prv
+	c.Panic400Str("incorrect private key-param")
+	return nil
 }
 
 func (c *Context) getNickname() string {
