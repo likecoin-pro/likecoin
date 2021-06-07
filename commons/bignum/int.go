@@ -47,6 +47,11 @@ func (x Int) Bytes() []byte {
 	return x.i.Bytes()
 }
 
+func (x *Int) SetBytes(b []byte) {
+	x.i = new(big.Int).SetBytes(b)
+	return
+}
+
 func (x Int) BinaryEncode(w io.Writer) error {
 	return bin.NewWriter(w).WriteBigInt(x.i)
 }
@@ -118,6 +123,10 @@ func (x Int) Max(y Int) Int {
 		return x
 	}
 	return y
+}
+
+func (x *Int) Increment(y Int) {
+	*x = x.Add(y)
 }
 
 func (x Int) Add(y Int) Int {
