@@ -82,6 +82,18 @@ func TestInt_Add(t *testing.T) {
 	assert.Equal(t, NewInt(5), z)
 }
 
+func TestInt_Increment(t *testing.T) {
+	var x Int
+	var y = NewInt(1)
+
+	for i := 0; i < 10000; i++ {
+		x.Increment(y)
+	}
+
+	assert.Equal(t, NewInt(10000), x)
+	assert.Equal(t, NewInt(1), y)
+}
+
 func TestInt_Mul(t *testing.T) {
 	var x = NewInt(2)
 	var y = NewInt(-3)
@@ -93,7 +105,7 @@ func TestInt_Mul(t *testing.T) {
 	assert.Equal(t, NewInt(-6), z)
 }
 
-func TestInt_BinaryEncode(t *testing.T) {
+func TestInt_BinWrite(t *testing.T) {
 	var x Int
 	var y = NewInt(123456)
 
@@ -104,14 +116,12 @@ func TestInt_BinaryEncode(t *testing.T) {
 	assert.Equal(t, bin.Encode(123456), data1)
 }
 
-func TestInt_BinaryDecode(t *testing.T) {
-	data := bin.Encode(0, -0x7fffffffffffffff)
+func TestInt_BinRead(t *testing.T) {
+	data := bin.Encode(-0x7fffffffffffffff)
 
 	var x Int
-	var y Int
-	err := bin.Decode(data, &x, &y)
+	err := bin.Decode(data, &x)
 
 	assert.NoError(t, err)
-	assert.True(t, x.IsZero())
-	assert.Equal(t, int64(-0x7fffffffffffffff), y.Int64())
+	assert.EqualValues(t, -0x7fffffffffffffff, x.Int64())
 }
